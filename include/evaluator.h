@@ -17,6 +17,7 @@ class Evaluator{
     Evaluator(int dados[], int tamanho, bool is_loop, Car* car);
     void Eval(unsigned long seconds);
     void CallMethod(int token);
+    bool CallFunction(int function_code, int function_args[], int tamanho);
 };
 
 #endif

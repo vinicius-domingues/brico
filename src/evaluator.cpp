@@ -11,6 +11,47 @@ Evaluator::Evaluator(int dados[], int tamanho, bool is_loop, Car* car){
    this->carrinho = car; 
 }
 
+bool Evaluator::CallFunction(int function_code, int function_args[], int tamanho){
+    int function_value = GARBAGE;
+    bool error_flag = false;
+
+    if(function_code == _DELAY){
+        Serial.print("[EVAL] function_code == _DELAY");
+        // Valida tipos
+    if(isNumberValue(function_args[0])){
+        if(function_args[0] == _ZERO){
+            function_value = 0;
+        }else if(function_args[0] == _ONE){
+            function_value = 1;
+        }
+        else if(function_args[0] == _FIVE){
+            function_value = 5;
+        }
+        else if(function_args[0] == _FIFTY){
+            function_value = 50;
+        }
+        else if(function_args[0] == _THOUSAND){
+            function_value = 1000;
+        }}else{
+            Serial.print("[EVAL] Erro, valor não é numérico");
+            error_flag = true;
+        }
+
+        // Se não der erro, executa
+        if(!error_flag){
+            // delay espera ms, então multiplicamos por 1000
+            function_value *= 1000;
+            Serial.print("[EVAL] Parando por (ms): "); Serial.println(function_value);
+            delay(function_value);
+        }
+
+    }
+
+    return error_flag;
+}
+ 
+
+
 void Evaluator::CallMethod(int token) {
     switch (token) {
         case _BRAKE:
@@ -55,10 +96,10 @@ void Evaluator::Eval(unsigned long segundos){
     int token = sequencia[pc];
     bool error_flag = false;
 
-    static int function_args[] = {-2, -2, -2, -2};
-    static int function_code = -2;
+    static int function_args[] = {GARBAGE, GARBAGE, GARBAGE, GARBAGE};
+    static int function_code = GARBAGE;
     static int function_pointer = 0;
-    static int function_value = -2;
+    static int function_value = GARBAGE;
     static bool is_in_function = false;
     //static bool is_in_condition = false;
 
@@ -82,45 +123,15 @@ void Evaluator::Eval(unsigned long segundos){
         Serial.print("[EVAL] função acabou e a função ativa é a: "); Serial.println(function_code);
 
         // Executor de funções (Valida tipos + Executa)
-        if(function_code == _DELAY){
-            Serial.print("[EVAL] function_code == _DELAY");
-            // Valida tipos
-            if(isNumberValue(function_args[0])){
-                if(function_args[0] == _ZERO){
-                    function_value = 0;
-                }else if(function_args[0] == _ONE){
-                    function_value = 1;
-                }
-                else if(function_args[0] == _FIVE){
-                    function_value = 5;
-                }
-                else if(function_args[0] == _FIFTY){
-                    function_value = 50;
-                }
-                else if(function_args[0] == _THOUSAND){
-                    function_value = 1000;
-                }
-            }else{
-                Serial.print("[EVAL] Erro, valor não é numérico");
-                error_flag = true;
-            }
+        error_flag = this->CallFunction(function_code, function_args, function_pointer);
 
-            // Execução
-            if(!error_flag){
-                // delay espera ms, então multiplicamos por 1000
-                function_value *= 1000;
-                Serial.print("[EVAL] Parando por (ms): "); Serial.println(function_value);
-                delay(function_value);
-            }
 
-        }
-
-        Serial.print("[EVAL] limpeza");
         // Limpeza para seguir o código
-        function_value = -2;
-        function_code = -2;
+        Serial.print("[EVAL] limpeza");
+        function_value = GARBAGE;
+        function_code = GARBAGE;
         for(int i = 0; i < function_pointer ; i++){
-            function_args[i] = -2;
+            function_args[i] = GARBAGE;
         }
         function_pointer = 0;
     }else if (is_in_function){

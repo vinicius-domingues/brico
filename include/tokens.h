@@ -2,6 +2,7 @@
     #define TOKENS_H
 
     #define _END 255
+    #define GARBAGE -2
 
     // Fluxo inicial
     #define _START 1  
