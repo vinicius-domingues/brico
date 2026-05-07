@@ -18,32 +18,36 @@ bool Evaluator::CallFunction(int function_code, int function_args[], int tamanho
     if(function_code == _DELAY){
         Serial.print("[EVAL] function_code == _DELAY");
         // Valida tipos
-    if(isNumberValue(function_args[0])){
-        if(function_args[0] == _ZERO){
-            function_value = 0;
-        }else if(function_args[0] == _ONE){
-            function_value = 1;
-        }
-        else if(function_args[0] == _FIVE){
-            function_value = 5;
-        }
-        else if(function_args[0] == _FIFTY){
-            function_value = 50;
-        }
-        else if(function_args[0] == _THOUSAND){
-            function_value = 1000;
-        }}else{
-            Serial.print("[EVAL] Erro, valor não é numérico");
-            error_flag = true;
-        }
+        if(isNumberValue(function_args[0])){
+            if(function_args[0] == _ZERO){
+                function_value = 0;
+            }else if(function_args[0] == _ONE){
+                function_value = 1;
+            }
+            else if(function_args[0] == _FIVE){
+                function_value = 5;
+            }
+            else if(function_args[0] == _FIFTY){
+                function_value = 50;
+            }
+            else if(function_args[0] == _THOUSAND){
+                function_value = 1000;
+            }
 
-        // Se não der erro, executa
-        if(!error_flag){
-            // delay espera ms, então multiplicamos por 1000
-            function_value *= 1000;
-            Serial.print("[EVAL] Parando por (ms): "); Serial.println(function_value);
-            delay(function_value);
+            // Se não der erro, executa
+            if(!error_flag){
+                // delay espera ms, então multiplicamos por 1000
+                function_value *= 1000;
+                Serial.print("[EVAL] Parando por (ms): "); Serial.println(function_value);
+                delay(function_value);
+            }
         }
+        else{
+                Serial.print("[EVAL] Erro, valor não é numérico");
+                error_flag = true;
+            }
+
+
 
     }
 
