@@ -11,6 +11,45 @@ Evaluator::Evaluator(int dados[], int tamanho, bool is_loop, Car* car){
    this->carrinho = car; 
 }
 
+void Evaluator::CallMethod(int token) {
+    switch (token) {
+        case _BRAKE:
+            Serial.println(F("[EVALUATOR] Acao ativada: Frear"));
+            this->carrinho->Brake();
+            break;
+            
+        case _ACCELERATE:
+            Serial.println(F("[EVALUATOR] Acao ativada: Acelerar"));
+            this->carrinho->Accelerate();
+            break;
+            
+        case _HONK:
+            Serial.println(F("[EVALUATOR] Acao ativada: Buzinar"));
+            this->carrinho->Honk();
+            break;
+            
+        case _RED_LED:
+            Serial.println(F("[EVALUATOR] Acao ativada: LED Vermelho"));
+            this->carrinho->RedLed();
+            break;
+            
+        case _GREEN_LED:
+            Serial.println(F("[EVALUATOR] Acao ativada: LED Verde"));
+            this->carrinho->GreenLed();
+            break;
+            
+        case _BLUE_LED:
+            Serial.println(F("[EVALUATOR] Acao ativada: LED Azul"));
+            this->carrinho->BlueLed();
+            break;
+            
+        default:
+            Serial.print(F("[EVALUATOR] Aviso: Token ignorado ou nao mapeado para acao fisica - "));
+            Serial.println(token);
+            break;
+    }
+}
+
 void Evaluator::Eval(unsigned long segundos){
     Serial.println(" li ---------------------------------------------------------------------------------------------------------------------------- ");
     int token = sequencia[pc];
@@ -100,25 +139,15 @@ void Evaluator::Eval(unsigned long segundos){
     }
     Serial.println(" ff ------------------------------------------");
 
+
+    // Validador de condições
+    
+
+
+
     // Executores de métodos void
-    if(token == _BRAKE){
-        
-        this->carrinho->Brake();
-    }else if(token == _ACCELERATE){
-        
-        this->carrinho->Accelerate();
-    }else if(token == _HONK){
-        
-        this->carrinho->Honk();
-    }else if(token == _RED_LED){
-        
-        this->carrinho->RedLed();
-    }else if(token == _BLUE_LED){
-        
-        this->carrinho->BlueLed();
-    }else if(token == _GREEN_LED){
-        
-        this->carrinho->GreenLed();   
+    if (isVoidMethod(token)){
+        this->CallMethod(token);
     }
 
     // Coordenador: Se o ponteiro estiver no último item lido e ainda não bateu em nenhum _END, é porque é LOOP, então volta para o começo
@@ -133,7 +162,7 @@ void Evaluator::Eval(unsigned long segundos){
         pc++;
     }
 
-    // Apenas checa o for de argumentos
+    // Apenas checa o for de argumentos (debug)
     for(int i = 0; i < 4 ; i++){
         Serial.print("[EVAL] contador: "); Serial.println(i);
         Serial.print("[EVAL] valor: "); Serial.println(function_args[i]);
