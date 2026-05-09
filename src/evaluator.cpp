@@ -46,15 +46,10 @@ bool Evaluator::CallFunction(int function_code, int function_args[], int tamanho
                 Serial.print("[EVAL] Erro, valor não é numérico");
                 error_flag = true;
             }
-
-
-
     }
 
     return error_flag;
 }
- 
-
 
 void Evaluator::CallMethod(int token) {
     switch (token) {
@@ -96,7 +91,6 @@ void Evaluator::CallMethod(int token) {
 }
 
 void Evaluator::Eval(unsigned long segundos){
-    Serial.println(" li ---------------------------------------------------------------------------------------------------------------------------- ");
     int token = sequencia[pc];
     bool error_flag = false;
 
@@ -104,18 +98,17 @@ void Evaluator::Eval(unsigned long segundos){
     static int function_code = GARBAGE;
     static int function_pointer = 0;
     static int function_value = GARBAGE;
+
     static bool is_in_function = false;
-    //static bool is_in_condition = false;
+    static bool is_in_condition = false;
 
-    Serial.println(" ");
-    Serial.print("[EVAL] Token: "); Serial.println(token);
-    Serial.print("[EVAL] Segundos: "); Serial.println(segundos);
+    Serial.println("[EVAL] [ TOKEN INIT ] --------------------------------------------------------------- ");
+    Serial.print("[EVAL] [ Token: "); Serial.print(token); Serial.print("  //  Segundos: "); Serial.print(segundos); Serial.println(" ]");
 
-    // Validador de funções --------------------------------------------------------------------------------------------------------
+    // Validador de funções 
     // Valida o começo da função, pegando qual função é e ativando a flag 'is_in_function'
-    Serial.println(" fi ------------------------------------------");
     if(isFunction(token)){
-        Serial.println("[EVAL] viu que é função");
+        Serial.println(" [EVAL] [ FUNCTION INIT ] --------------------------------------------------------------- ");
         is_in_function = true;
         function_code = token;
 
@@ -129,7 +122,6 @@ void Evaluator::Eval(unsigned long segundos){
         // Executor de funções (Valida tipos + Executa)
         error_flag = this->CallFunction(function_code, function_args, function_pointer);
 
-
         // Limpeza para seguir o código
         Serial.print("[EVAL] limpeza");
         function_value = GARBAGE;
@@ -138,6 +130,7 @@ void Evaluator::Eval(unsigned long segundos){
             function_args[i] = GARBAGE;
         }
         function_pointer = 0;
+        Serial.println(" [EVAL] [ FUNCTION END ] --------------------------------------------------------------- ");
     }else if (is_in_function){
         Serial.println("[EVAL] viu que tá dentro da função, armazenou");
         function_args[function_pointer] = token;
@@ -152,14 +145,9 @@ void Evaluator::Eval(unsigned long segundos){
         
     // Ao final da função, tira da flag de 'is_in_function' e começa a executar pois já armazenou todos os argumentos
     }
-    Serial.println(" ff ------------------------------------------");
-
 
     // Validador de condições
     
-
-
-
     // Executores de métodos void
     if (isVoidMethod(token)){
         this->CallMethod(token);
@@ -177,16 +165,21 @@ void Evaluator::Eval(unsigned long segundos){
         pc++;
     }
 
-    // Apenas checa o for de argumentos (debug)
-    for(int i = 0; i < 4 ; i++){
-        Serial.print("[EVAL] contador: "); Serial.println(i);
-        Serial.print("[EVAL] valor: "); Serial.println(function_args[i]);
+    // Se estiver dentro de condição ou função (só debug)
+    if (is_in_function || is_in_condition){
+        // Apenas checa o for de argumentos (debug)
+        for(int i = 0; i < 4 ; i++){
+            Serial.print("[EVAL] contador: "); Serial.println(i);
+            Serial.print("[EVAL] valor: "); Serial.println(function_args[i]);
+        }
     }
+
+    Serial.println("[EVAL] [ TOKEN END ] --------------------------------------------------------------- ");
 
     // O erro aqui apenas faz parar de rodar
     if(error_flag){
         this->run = false;
     }
-    Serial.println(" lf ---------------------------------------------------------------------------------------------------------------------------- ");
+
 }
 

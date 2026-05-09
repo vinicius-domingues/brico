@@ -10,11 +10,11 @@ class Syntax {
         int* tokens;
         int total;
 
-        Syntax(int dados[], int tamanho);
-        bool Parser();
-        bool LookAhead();
-        bool Semantic();
-        bool ExpressionValidator(int dados[], int tamanho);
+        //Syntax();
+        bool Parser(int sequence[], int blocks_used);
+        bool LookAhead(int sequence[], int blocks_used);
+        bool Semantic(int sequence[], int blocks_used);
+        bool ExpressionValidator(int sequence_in_expression[], int saves);
 };
 
 #endif

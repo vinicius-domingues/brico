@@ -21,6 +21,11 @@ void Controller::Prepare() {
     Serial.println(F("[HARDWARE] Prepare enviado."));
 }
 
+void Controller::Stop() {
+    Serial.println(F("[STOP]"));
+    delay(999999);
+}
+
 void Controller::Clock() {
     digitalWrite(PIN_CLOCK, HIGH);
     delay(10); 
@@ -145,14 +150,10 @@ void Controller::writeEEPROM(int address, byte data) {
     Wire.endTransmission();
 }
 
-void Controller::Cleaner(){
-
-}
-
-void Controller::Mapper() {
+void Controller::Mapper(int sequence[], int& blocks_used) {
     Serial.println(F("\n[MAPPER] Iniciando leitura do barramento (Shift Register)"));
     
-    blocks_read = 0;
+    blocks_used = 0;
     got_error = false;
     is_loop = false;
 
@@ -165,15 +166,15 @@ void Controller::Mapper() {
     int physical_clocks = 0; // Conta os shifts mecânicos executados
 
     // 1 - Injeta o _START no começo (posição 0) da fita na RAM
-    sequence[blocks_read] = _START;
-    blocks_read++;
+    sequence[blocks_used] = _START;
+    blocks_used++;
     Serial.println(F("[MAPPER] [INJECAO] _START (1) adicionado obrigatoriamente no inicio."));
 
     // Prepara o hardware (Limpa o Shift Register e seta o primeiro bloco)
     Prepare();
 
     // Loop de varredura (controlado pelo tamanho máximo da RAM)
-    while (blocks_read < blocks_limit) {
+    while (blocks_used < 100) {
         
         // Dá o clock para o Shift Register avançar o estado ativo para a próxima peça
         physical_clocks++; // Registra que o bastão andou um passo físico
@@ -191,8 +192,8 @@ void Controller::Mapper() {
 
             if (qtd_functions > 0) {
                 Serial.println(F("[MAPPER] [SUBSTITUICAO] 255 trocado por _ENDFUNCTION (6)."));
-                sequence[blocks_read] = _ENDFUNCTION;
-                blocks_read++;
+                sequence[blocks_used] = _ENDFUNCTION;
+                blocks_used++;
                 qtd_functions--;
                 
                 // Mergulho de Resgate (Fast-Forward no Shift Register)
@@ -215,8 +216,8 @@ void Controller::Mapper() {
 
             } else if (qtd_conditions > 0) {
                 Serial.println(F("[MAPPER] [SUBSTITUICAO] 255 trocado por _ENDCONDITION (4)."));
-                sequence[blocks_read] = _ENDCONDITION;
-                blocks_read++;
+                sequence[blocks_used] = _ENDCONDITION;
+                blocks_used++;
                 qtd_conditions--;
                 
                 // Mergulho de Resgate (Fast-Forward no Shift Register)
@@ -243,9 +244,9 @@ void Controller::Mapper() {
                 Serial.println(F("[MAPPER] 255 lido com saldos estruturais zerados. FIM REAL DA TRILHA."));
                 
                 // Injeção de Borda: O código final exige _START como fechador absoluto da fita virtual
-                sequence[blocks_read] = _START;
-                //blocks_read = blocks_limit;
-                blocks_read++;
+                sequence[blocks_used] = _START;
+                //blocks_used = blocks_limit;
+                blocks_used++;
                 
                 Serial.println(F("[MAPPER] [INJECAO] _START (1) adicionado como FIM absoluto da fita na RAM."));
                 break; // Sai do laço while, mapeamento concluído
@@ -269,8 +270,8 @@ void Controller::Mapper() {
             }
 
             // Grava o token lido na fita virtual da RAM do Arduino
-            sequence[blocks_read] = token_lido;
-            blocks_read++;
+            sequence[blocks_used] = token_lido;
+            blocks_used++;
         }
         
         Clock(); // O prepare ja da um clock inicial, entao só precisa ler aqui
@@ -282,9 +283,9 @@ void Controller::Mapper() {
 // Debug final de como ficou a fita salva na RAM do Arduino, pronta para o Evaluator
     Serial.println(F("=================================================="));
     Serial.print(F("[MAPPER] FITA FINAL DE TOKENS NA RAM: "));
-    for (int i = 0; i < blocks_read; i++) {
+    for (int i = 0; i < blocks_used; i++) {
         Serial.print(sequence[i]);
-        if (i < blocks_read - 1) Serial.print(F(" - "));
+        if (i < blocks_used - 1) Serial.print(F(" - "));
     }
     Serial.println();
 
@@ -294,13 +295,13 @@ void Controller::Mapper() {
     
     // 1. Avisa o Slave qual é o tamanho total da fita
     Wire.beginTransmission(8); 
-    Wire.write(blocks_read); 
+    Wire.write(blocks_used); 
     
     
     delay(20); // Dá um respiro pro Slave zerar os contadores dele
 
     // 2. Envia a fita verdadeira, uma peça por vez!
-    for (int i = 0; i < blocks_read; i++) {
+    for (int i = 0; i < blocks_used; i++) {
         
         Wire.write(sequence[i]); // Cast para byte garante a conversão limpa
         

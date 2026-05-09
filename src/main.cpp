@@ -10,7 +10,11 @@ Syntax* analisador;
 Car* carrinho;
 Evaluator* executor;
 
-unsigned long ready_instant = 0;
+static const int blocks_limit = 100; // Limite de blocos no sistema
+int sequence[blocks_limit];          // Array de sequencia
+int blocks_read = 0;                 // Posições do array que foram usadas
+
+unsigned long brand_new_instant = 0;
 unsigned long seconds_running = 0;
 enum SystemState {
     STATE_DEBUG,
@@ -22,59 +26,71 @@ SystemState currentState = STATE_DEBUG;
 
 void setup() {
     Serial.begin(9600);
+
+    Serial.println(" ");
+
     arduino = new Controller();
     carrinho = new Car();
-    
-    Serial.println(F("[MAIN] Hardware inicializado."));
+    analisador = new Syntax();
+
+    Serial.println(" ");
 }
 
 void loop() {
     switch (currentState) {
-        
         case STATE_DEBUG:
-            // 1. O código estaciona aqui dentro do método até receber o comando 'L'
-            arduino->DebugMenu();
-            
-            // 2. O usuário enviou 'L'. Transita para a próxima fase.
+            // arduino->DebugMenu();
             currentState = STATE_COMPILE;
-            break;
 
         case STATE_COMPILE: {
-            bool error_flag = false;
+            int error_stage = 0; 
 
-            // Inicia o fluxo padrão do interpretador
-            arduino->Listener(); // Aguarda o botão do Pino 5 ser pressionado fisicamente
+            // arduino->Listener();
+            // arduino->Mapper(sequence, blocks_read);
+            
+            // Testes
+            Serial.println(F("[MAIN] Rodando em modo de TESTE"));
+            int teste[] = {_START, _IF, _PROXIMITY, _EQUAL, _TRUE, _ENDCONDITION, _ENDBLOCK};
+            blocks_read = sizeof(teste) / sizeof(teste[0]);
+            memcpy(sequence, teste, sizeof(teste));
 
-            // Limpeza
-            arduino->Cleaner();
 
-            arduino->Mapper();   // Mapeia o hardware
-
-            // Validação em 3 camadas
-            analisador = new Syntax(arduino->sequence, arduino->blocks_read);
-
-            error_flag = analisador->Parser() || 
-                              analisador->LookAhead() || 
-                              analisador->Semantic();
-
-            // Controle de transição
-            if (!error_flag) {
-                Serial.println(F("[MAIN] Código Limpo! Preparando Evaluator..."));
+            if (analisador->Parser(sequence, blocks_read)) {
+                error_stage = 1;
+                Serial.println(F("[MAIN] Código abortado: Erro de Estrutura (Parser)."));
                 
-                // Evita vazamento de memória deletando instâncias de rodadas anteriores
+            } else if (analisador->LookAhead(sequence, blocks_read)) {
+                error_stage = 2;
+                Serial.println(F("[MAIN] Código abortado: Erro de Vizinhança (LookAhead)."));
+                
+            } else if (analisador->Semantic(sequence, blocks_read)) {
+                error_stage = 3;
+                Serial.println(F("[MAIN] Código abortado: Erro de Lógica (Semântica)."));
+            }       
+
+            // Controle de transição com base no resultado
+            if (error_stage == 0) {
+                Serial.println(F("[MAIN] Sem erros. Passando código validado via UART."));
+                
+
+                // Passaria via UART. Não terá aqui o Evaluator nem o Executor
+                    // Passamos: Sequencia uma a uma e se é loop ou não (o tamanho da sequencia n precisa pois isso pode ser feito no EvaL)
+
+                // Mata objeto executor anterior
                 if (executor != nullptr) { delete executor; }
+
+                // Instância
+                executor = new Evaluator(sequence, blocks_read, arduino->is_loop, carrinho);
                 
-                executor = new Evaluator(arduino->sequence, arduino->blocks_read, arduino->is_loop, carrinho);
-                
-                ready_instant = millis();
-                seconds_running = 0;
-                
-                // Vai para a execução contínua
                 currentState = STATE_RUNNING; 
+
+                Serial.println(F("[MAIN] Avaliação começando."));
+                
             } else {
-                Serial.println(F("[MAIN] Erros identificados. Abortando execução e voltando ao Debug."));
-                delete analisador; 
-                currentState = STATE_DEBUG; // Devolve pro terminal
+                Serial.println(F("[MAIN] Voltando ao Debug devido a erros."));
+                if (analisador != nullptr) { delete analisador; }
+                if (executor != nullptr) { delete executor; }
+                currentState = STATE_DEBUG; 
             }
             break;
         }
@@ -82,24 +98,32 @@ void loop() {
         case STATE_RUNNING: {
             unsigned long actual_instant = millis();
 
-            // Relógio interno de execução
-            if (actual_instant - ready_instant >= 1000) {
+            // Incrementa os segundos (nossa variável 'Segundos')
+            if (actual_instant - brand_new_instant >= 1000) {
+                Serial.println(F("[EVAL] +1s."));
                 seconds_running++;           
-                ready_instant = actual_instant; 
+                brand_new_instant = actual_instant; 
+
+                
             }
 
             // Executa os comandos lidos do hardware
             if (executor->run) {
+                Serial.println(F("[EVAL] Rodando"));
                 executor->Eval(seconds_running);
             } else {
-                // Ao invés de prender em um while(true) no final, o sistema limpa as mãos e recomeça
                 Serial.println(F("\n[MAIN] Fim do script alcançado! Execução do carrinho concluída."));
                 Serial.println(F("[MAIN] Retornando ao console de depuração..."));
                 
-                delete analisador; // Libera RAM
-                currentState = STATE_DEBUG; // Transita de volta para a espera serial
+                delete analisador; 
+                currentState = STATE_DEBUG; 
             }
+
+            arduino->Stop();
+
             break;
         }
     }
+
+    Serial.println(" ");
 }

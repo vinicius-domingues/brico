@@ -1,12 +1,7 @@
 #include "syntax.h"
 #include "tokens.h"
 
-Syntax::Syntax(int dados[], int tamanho){
-   tokens = dados; 
-   total = tamanho;
-}
-
-bool Syntax::Parser(){
+bool Syntax::Parser(int sequence[], int blocks_used){
     int token_da_vez;
     int count_conditions = 0;
     int count_blocks = 0;
@@ -14,8 +9,8 @@ bool Syntax::Parser(){
     bool error_flag = false;
 
     if(!error_flag){
-        for(int i = 0 ; i < total ; i++){
-            token_da_vez = tokens[i];
+        for(int i = 0 ; i < blocks_used ; i++){
+            token_da_vez = sequence[i];
 
             switch (token_da_vez) {
                 
@@ -91,17 +86,17 @@ bool Syntax::Parser(){
     return error_flag;
 }
 
-bool Syntax::LookAhead(){
+bool Syntax::LookAhead(int sequence[], int blocks_used){
     bool error_flag = false;
     int token_da_vez;
     int proximo = 0;
 
-    for (int i = 0; i < total; i++) {
+    for (int i = 0; i < blocks_used; i++) {
         
-        token_da_vez = tokens[i];
+        token_da_vez = sequence[i];
 
-        if (i + 1 < total){
-            proximo = tokens[i + 1];
+        if (i + 1 < blocks_used){
+            proximo = sequence[i + 1];
         }else{
             proximo = _END;
         }
@@ -226,7 +221,7 @@ bool Syntax::LookAhead(){
     return error_flag;
 }
 
-bool Syntax::Semantic(){
+bool Syntax::Semantic(int sequence[], int blocks_used){
     bool error_flag = false;
     int token_da_vez;
     int qtd_conditions = 0;
@@ -238,8 +233,8 @@ bool Syntax::Semantic(){
     bool is_in_condition = false;
     bool is_in_function = false;
 
-    for (int i = 0; i < total; i++) {
-        token_da_vez = tokens[i];
+    for (int i = 0; i < blocks_used ; i++) {
+        token_da_vez = sequence[i];
 
         // Se abertura de condições maior que zero, está em uma condição
         if(qtd_conditions > 0){
@@ -366,37 +361,37 @@ bool Syntax::ExpressionValidator(int tokens_in_condition[], int size_tokens_in_c
     int last_condition_token = 0;
     bool error_flag = false;
 
-    Serial.println(F("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------"));
-    Serial.print(F("[EXPRESSION] Quantia total: ")); Serial.println(total_qtd);
+    //Serial.println(F("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------"));
+   // Serial.print(F("[SEMANTIC] Quantia total: ")); Serial.println(total_qtd);
     for(int l = 0; l < total_qtd ; l++){
-        Serial.print(F("[EXPRESSION] [l]: ")); Serial.println(l);
-        Serial.print(F("[EXPRESSION] [Pos absoluta]: ")); Serial.println(position_in_array[l]);
+        //Serial.print(F("[SEMANTIC] [l]: ")); Serial.println(l);
+        //Serial.print(F("[SEMANTIC] [Pos absoluta]: ")); Serial.println(position_in_array[l]);
 
         // Se não é lógico, soma o token lido
         if(!isLogical(position_in_array[l])){
             qtd_tokens_per_expression++;    
-            Serial.print(F("[EXPRESSION] qtd_tokens_per_expression SOMADO: ")); Serial.println(qtd_tokens_per_expression);
+            //Serial.print(F("[SEMANTIC] qtd_tokens_per_expression SOMADO: ")); Serial.println(qtd_tokens_per_expression);
         }else{
-            Serial.print(F("[EXPRESSION] qtd_tokens_per_expression NÃO SOMADO: ")); Serial.println(qtd_tokens_per_expression);
+            //Serial.print(F("[SEMANTIC] qtd_tokens_per_expression NÃO SOMADO: ")); Serial.println(qtd_tokens_per_expression);
         }
 
         // Se for fim da expressão (caraceter condicional) ou fim da condição, valida o progresso até ali
         if(isLogical(position_in_array[l]) || (total_qtd == (l + 1))){
             qtd_dividers++;
-            Serial.print(F("[EXPRESSION] [Entrada]: ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ")); Serial.print(qtd_dividers); Serial.println(F(" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ "));
+            //Serial.print(F("[SEMANTIC] [Entrada]: ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ")); Serial.print(qtd_dividers); Serial.println(F(" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ "));
 
             // Reposicionamento de último token considerado lido (não inclui os lógicos)
             last_condition_token = l;
             if(isLogical(position_in_array[l])){
-                Serial.println(F("[EXPRESSION] Motivo de entrada 1: isLogical(position_in_array[l]"));
+                Serial.println(F("[SEMANTIC] Motivo de entrada 1: isLogical(position_in_array[l]"));
                 last_condition_token--;
             }
             else {
-                Serial.println(F("[EXPRESSION] Motivo de entrada 2: total_qtd == (qtd_tokens_per_expression == l+1)"));
+                //Serial.println(F("[SEMANTIC] Motivo de entrada 2: total_qtd == (qtd_tokens_per_expression == l+1)"));
             }            
 
-            Serial.print(F("[EXPRESSION] [Último token relativo]: ")); Serial.println(position_in_array[last_condition_token]);            
-            Serial.print(F("[EXPRESSION] [Expressão]: ")); Serial.println(qtd_dividers);            
+            //Serial.print(F("[SEMANTIC] [Último token relativo]: ")); Serial.println(position_in_array[last_condition_token]);            
+            //Serial.print(F("[SEMANTIC] [Expressão]: ")); Serial.println(qtd_dividers);            
 
             /* Validação de quantidade nas expressões
                 1 - Tem quer ter 1 ou 3 valores (qtd_tokens_per_expression)
@@ -404,29 +399,29 @@ bool Syntax::ExpressionValidator(int tokens_in_condition[], int size_tokens_in_c
             
             switch (qtd_tokens_per_expression){
                 case 0:
-                    Serial.println(F("[EXPRESSION] Case 0 (qtd_tokens_per_expression)"));
-                    Serial.println(F("[EXPRESSION] Erro: Expressão vazia"));
+                    // Serial.println(F("[SEMANTIC] Case 0 (qtd_tokens_per_expression)"));
+                    Serial.println(F("[SEMANTIC] Erro: Expressão vazia"));
                     error_flag = true;
                     break;
                 case 1:
-                    Serial.println(F("[EXPRESSION] Case 1 (qtd_tokens_per_expression)"));
+                    // Serial.println(F("[SEMANTIC] Case 1 (qtd_tokens_per_expression)"));
                     if(!isMethod(position_in_array[last_condition_token])){
-                        Serial.println(F("[EXPRESSION] Erro: Expressão única não é MÉTODO do tipo BOOLEANO"));
+                        Serial.println(F("[SEMANTIC] Erro: Expressão única não é MÉTODO do tipo BOOLEANO"));
                         error_flag = true;
                     }else{
                         if(!(getType(position_in_array[last_condition_token]) == _BOOLEAN)){
-                            Serial.println(F("[EXPRESSION] Erro: Método da expressão única deveria ser booleano"));
+                            Serial.println(F("[SEMANTIC] Erro: Método da expressão única deveria ser booleano"));
                             error_flag = true;
                         }
                     }
                     break;
                 case 2:
-                    Serial.println(F("[EXPRESSION] Case 2 (qtd_tokens_per_expression)"));
-                    Serial.println(F("[EXPRESSION] Erro: Expressão tem valores insuficientes (2)"));
+                    // Serial.println(F("[SEMANTIC] Case 2 (qtd_tokens_per_expression)"));
+                    Serial.println(F("[SEMANTIC] Erro: Expressão tem valores insuficientes (2)"));
                     error_flag = true;
                     break;
                 case 3:
-                    Serial.println(F("[EXPRESSION] Case 3 (qtd_tokens_per_expression)"));
+                    // Serial.println(F("[SEMANTIC] Case 3 (qtd_tokens_per_expression)"));
                 {
                     int pointer = last_condition_token;      // x
                     int slots = last_condition_token - 3;    // x - 3
@@ -436,7 +431,7 @@ bool Syntax::ExpressionValidator(int tokens_in_condition[], int size_tokens_in_c
                     // Verificação da estrutura passada
                     for( ; pointer > slots ; pointer--){
                         
-                        Serial.print(F("[EXPRESSION] Stage: ")); Serial.println(position_in_array[pointer]);
+                        // Serial.print(F("[SEMANTIC] Stage: ")); Serial.println(position_in_array[pointer]);
                         /* Validação da lógica nas expressões compostas
                             1 - Comparações devem ser realizadas entre o mesmo tipo
                             2 - Se o valor for booleano, a comparação deve ser com igual
@@ -445,7 +440,7 @@ bool Syntax::ExpressionValidator(int tokens_in_condition[], int size_tokens_in_c
                         switch(stage){
                             case 0: // Verifica se é valor (METODO/VARIAVEL  IGUAL  <<TRUE>>)
                                 if(!isValue(position_in_array[pointer])){
-                                    Serial.println(F("[EXPRESSION] Erro: Elemento 3 da expressão não é um valor"));
+                                    Serial.println(F("[SEMANTIC] Erro: Elemento 3 da expressão não é um valor"));
                                     error_flag = true;
                                 }else{
                                     value_type = getType(position_in_array[pointer]);
@@ -453,23 +448,23 @@ bool Syntax::ExpressionValidator(int tokens_in_condition[], int size_tokens_in_c
                                 break;
                             case 1: // Verifica se é operador (METODO/VARIAVEL  <<IGUAL>>  TRUE)
                                 if(!isOperation(position_in_array[pointer])){
-                                    Serial.println(F("[EXPRESSION] Erro: Elemento 2 da expressão não é um operador"));
+                                    Serial.println(F("[SEMANTIC] Erro: Elemento 2 da expressão não é um operador"));
                                     error_flag = true;
                                 }else{
                                     // Se value_type for booleano e a operação for diferente de IGUAL
                                     if(value_type == _BOOLEAN && !(position_in_array[pointer] == _EQUAL)){
-                                        Serial.println(F("[EXPRESSION] Erro: Operador (elemento 2) da expressão deve ser IGUAL, quando valor (elemento 3) é BOOLEANO"));
+                                        Serial.println(F("[SEMANTIC] Erro: Operador (elemento 2) da expressão deve ser IGUAL, quando valor (elemento 3) é BOOLEANO"));
                                         error_flag = true;
                                     }
                                 }
                                 break;
                             case 2: // Verifica se é método ou variável (<<METODO/VARIAVEL>>  IGUAL  TRUE)
                                 if(!isVariable(position_in_array[pointer]) && !isNonVoidMethod(position_in_array[pointer])){
-                                    Serial.println(F("[EXPRESSION] Erro: Elemento 1 da expressão não é variável ou não é método não-nulo"));
+                                    Serial.println(F("[SEMANTIC] Erro: Elemento 1 da expressão não é variável ou não é método não-nulo"));
                                     error_flag = true;
                                 }else{
                                     if(getType(position_in_array[pointer]) != value_type){
-                                        Serial.println(F("[EXPRESSION] Erro: O método/variável (elemento 1) deve ser do mesmo tipo do valor (elemento 3) que está sendo comparado"));
+                                        Serial.println(F("[SEMANTIC] Erro: O método/variável (elemento 1) deve ser do mesmo tipo do valor (elemento 3) que está sendo comparado"));
                                         error_flag = true;    
                                     }
                                 }
@@ -484,14 +479,14 @@ bool Syntax::ExpressionValidator(int tokens_in_condition[], int size_tokens_in_c
                     break;
                 }
                 default:
-                    Serial.println(F("[EXPRESSION] Erro: Fração da condição tem valores demais (4+)"));
+                    Serial.println(F("[SEMANTIC] Erro: Fração da condição tem valores demais (4+)"));
                     error_flag = true;
                     break;
             }
             
             // Limpeza (pois daqui iniciará uma nova expressão na mesma condição)
             qtd_tokens_per_expression = 0; 
-            Serial.print(F("[EXPRESSION] [Saída]: ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ")); Serial.print(qtd_dividers); Serial.println(F(" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ "));
+            // Serial.print(F("[SEMANTIC] [Saída]: ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ")); Serial.print(qtd_dividers); Serial.println(F(" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ "));
         }
     }
 
