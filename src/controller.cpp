@@ -75,17 +75,16 @@ void Controller::DebugMenu() {
     bool in_debug = true;
     bool estadoSet = false;
 
-    Serial.println(F("\n====================================="));
-    Serial.println(F("🛠️  CONSOLE DE DEBUG - FUZZY BLOCKS "));
-    Serial.println(F("====================================="));
-    Serial.println(F("'c' -> Gerar pulso de Clock"));
-    Serial.println(F("'r' -> Ler EEPROM (Posição 1)"));
-    Serial.println(F("'w' -> Escrever na EEPROM (Posição 1)"));
-    Serial.println(F("'s' -> Alternar estado do pino SET"));
-    Serial.println(F("'l' -> Sair do Debug e iniciar LISTENER"));
-    Serial.println(F("'t' -> Transmitir para o outro Arduino"));
-
-    Serial.println(F("====================================="));
+    Serial.println(F("\n|===================================="));
+    Serial.println(F("|  CONSOLE DE DEBUG - FUZZY BLOCKS  |"));
+    Serial.println(F("|===================================="));
+    Serial.println(F("| 'c' -> Gerar pulso de Clock"));
+    Serial.println(F("| 'r' -> Ler EEPROM (Posição 1)"));
+    Serial.println(F("| 'w' -> Escrever na EEPROM (Posição 1)"));
+    Serial.println(F("| 's' -> Alternar estado do pino SET"));
+    Serial.println(F("| 'l' -> Sair / iniciar LISTENER"));
+    Serial.println(F("| 't' -> Transmitir para o outro Arduino"));
+    Serial.println(F("|____________________________________"));
 
     // Limpa qualquer lixo que tenha ficado no buffer da porta serial
     while(Serial.available() > 0) { Serial.read(); }

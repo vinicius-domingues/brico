@@ -39,39 +39,33 @@ void setup() {
 void loop() {
     switch (currentState) {
         case STATE_DEBUG:
-            // arduino->DebugMenu();
+            arduino->DebugMenu();
             currentState = STATE_COMPILE;
 
         case STATE_COMPILE: {
             int error_stage = 0; 
 
             // arduino->Listener();
-            // arduino->Mapper(sequence, blocks_read);
             
-            // Testes
+            // arduino->Mapper(sequence, blocks_read); // Tem que dar erro se houver mais que 100 blocos.
+            
+            // Testes apenas
             Serial.println(F("[MAIN] Rodando em modo de TESTE"));
-            int teste[] = {_START, _IF, _PROXIMITY, _EQUAL, _TRUE, _ENDCONDITION, _ENDBLOCK};
+            int teste[] = {_START, _RED_LED, _DELAY, _FIVE, _ENDFUNCTION, _GREEN_LED, _END};
             blocks_read = sizeof(teste) / sizeof(teste[0]);
             memcpy(sequence, teste, sizeof(teste));
 
-
             if (analisador->Parser(sequence, blocks_read)) {
                 error_stage = 1;
-                Serial.println(F("[MAIN] Código abortado: Erro de Estrutura (Parser)."));
-                
             } else if (analisador->LookAhead(sequence, blocks_read)) {
                 error_stage = 2;
-                Serial.println(F("[MAIN] Código abortado: Erro de Vizinhança (LookAhead)."));
-                
             } else if (analisador->Semantic(sequence, blocks_read)) {
                 error_stage = 3;
-                Serial.println(F("[MAIN] Código abortado: Erro de Lógica (Semântica)."));
             }       
 
             // Controle de transição com base no resultado
             if (error_stage == 0) {
                 Serial.println(F("[MAIN] Sem erros. Passando código validado via UART."));
-                
 
                 // Passaria via UART. Não terá aqui o Evaluator nem o Executor
                     // Passamos: Sequencia uma a uma e se é loop ou não (o tamanho da sequencia n precisa pois isso pode ser feito no EvaL)
@@ -98,28 +92,22 @@ void loop() {
         case STATE_RUNNING: {
             unsigned long actual_instant = millis();
 
-            // Incrementa os segundos (nossa variável 'Segundos')
+            // Incrementa nossa variável 'Segundos', com no mínimo de taxa de atualização de 1 segundo
             if (actual_instant - brand_new_instant >= 1000) {
                 Serial.println(F("[EVAL] +1s."));
-                seconds_running++;           
+                seconds_running += (actual_instant - brand_new_instant) / 1000;           
                 brand_new_instant = actual_instant; 
-
-                
             }
 
-            // Executa os comandos lidos do hardware
+            // Executa até voltar para esperar outro eventual código
             if (executor->run) {
                 Serial.println(F("[EVAL] Rodando"));
                 executor->Eval(seconds_running);
             } else {
-                Serial.println(F("\n[MAIN] Fim do script alcançado! Execução do carrinho concluída."));
-                Serial.println(F("[MAIN] Retornando ao console de depuração..."));
-                
+                Serial.println(F("\n[MAIN] Fim do script alcançado! Execução do carrinho concluída.    //    Retornando ao console de depuração..."));
                 delete analisador; 
                 currentState = STATE_DEBUG; 
             }
-
-            arduino->Stop();
 
             break;
         }

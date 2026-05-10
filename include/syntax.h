@@ -14,7 +14,8 @@ class Syntax {
         bool Parser(int sequence[], int blocks_used);
         bool LookAhead(int sequence[], int blocks_used);
         bool Semantic(int sequence[], int blocks_used);
-        bool ExpressionValidator(int sequence_in_expression[], int saves);
+        bool ExpressionValidator(int sequence_in_expression[], int positions);
+        bool FunctionValidator(int function_code, int function_args[], int tamanho);
 };
 
 #endif

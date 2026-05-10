@@ -3,6 +3,7 @@
 
     #define _END 255
     #define GARBAGE -2
+    #define ACTIVATED -3
 
     // Fluxo inicial
     #define _START 1  

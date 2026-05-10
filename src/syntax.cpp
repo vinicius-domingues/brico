@@ -152,9 +152,9 @@ bool Syntax::LookAhead(int sequence[], int blocks_used){
 
         // Token VALOR (6/11)
         else if(isValue(token_da_vez)){
-            if(!isLogical(proximo) && !isEndCondition(proximo) && !isEndFunction(proximo)){
+            if(!isLogical(proximo) && !isEndCondition(proximo) && !isEndFunction(proximo) && !isValue(proximo) ){
                 result = 13;
-                Serial.println(F("[LOOKAHEAD] Erro 13: Valor deve ser seguido por Logico ou Fechamento de função/condição"));
+                Serial.println(F("[LOOKAHEAD] Erro 13: Valor deve ser seguido por Logico, valor ou Fechamento de função/condição"));
                 error_flag = true;
             }
         }
@@ -222,14 +222,19 @@ bool Syntax::LookAhead(int sequence[], int blocks_used){
 }
 
 bool Syntax::Semantic(int sequence[], int blocks_used){
-    bool error_flag = false;
+    static const int condition_spaces = 50; // Limite de blocos para a condição
+    static const int function_spaces = 4; // Limite de blocos para a função
+    static int function_code = GARBAGE;
+    static int function_pointer = 0;
+    int function_args[function_spaces] = {GARBAGE};
+    int tokens_in_condition_space[condition_spaces] = {GARBAGE}; 
     int token_da_vez;
     int qtd_conditions = 0;
     int qtd_functions = 0;
     int saving_token = 0;
     int qtd_elements_in_condition = 0;
-    int tokens_in_condition_space[] = {-2, -2, -2, -2 , -2, -2, -2, -2, -2, -2, -2 , -2}; // 12
     int missing_endblocks = 0; 
+    bool error_flag = false;
     bool is_in_condition = false;
     bool is_in_function = false;
 
@@ -240,7 +245,7 @@ bool Syntax::Semantic(int sequence[], int blocks_used){
         if(qtd_conditions > 0){
             if(!isEndCondition(token_da_vez)){
                 // Bloqueia overflow (uma condição pode ter apenas 4 OU ou E)
-                if(saving_token < 12) { 
+                if(saving_token < condition_spaces) { 
                         tokens_in_condition_space[saving_token] = token_da_vez;
                         saving_token++;
                 } else {
@@ -264,8 +269,8 @@ bool Syntax::Semantic(int sequence[], int blocks_used){
                     result = 20;
                     break;
                 }else{ // Limpa para continuar para a próxima condição
-                    for(int k = 0 ; k < 12 ; k++) {
-                        tokens_in_condition_space[k] = -2;        
+                    for(int k = 0 ; k < condition_spaces ; k++) {
+                        tokens_in_condition_space[k] = GARBAGE;        
                     }
                     
                     saving_token = 0;
@@ -276,7 +281,6 @@ bool Syntax::Semantic(int sequence[], int blocks_used){
         }
         
     
-
         // Se abertura de funções maior que zero, está em uma função
         if(qtd_functions > 0){
             is_in_function = true;
@@ -287,7 +291,6 @@ bool Syntax::Semantic(int sequence[], int blocks_used){
         if(isCondition(token_da_vez)){
             qtd_conditions++;
             missing_endblocks++;
-
         }else if(isEndCondition(token_da_vez)){
             qtd_conditions--;
         }
@@ -298,8 +301,35 @@ bool Syntax::Semantic(int sequence[], int blocks_used){
 
         if(isFunction(token_da_vez)){
             qtd_functions++;
+            function_code = token_da_vez;
         }else if(isEndFunction(token_da_vez)){
             qtd_functions--;
+
+            // Valida se os tipos e a quantidade de argumentos está certa
+            error_flag = this->FunctionValidator(function_code, function_args, function_pointer);
+            
+            // Limpeza
+            function_code = GARBAGE;
+
+
+        }else if(is_in_function){
+            // Não pode nada além de valor numérico dentro de função
+            if(!isNumberValue(token_da_vez) && !isFunction(token_da_vez) && !isEndFunction(token_da_vez)){
+                Serial.println(F("[SEMANTIC] Erro: Funcao aceita apenas valores numericos"));
+                error_flag = true; 
+            }
+
+            // Armazena
+            function_args[function_pointer] = token_da_vez;
+
+            // Serial.print(F("Somando um no ponteiro: ")); Serial.println(function_pointer);
+            function_pointer++;
+
+            // Valida estouro de funções gerais
+            if(function_pointer > function_spaces){
+                Serial.println(F("[SEMANTIC] Erro: Estouro de valores."));
+                error_flag = true;
+            }
         }
 
         if(is_in_condition){
@@ -318,25 +348,16 @@ bool Syntax::Semantic(int sequence[], int blocks_used){
             }
         }
         
-        
-        // Não pode fechar bloco de condição 
+        // Não pode fechar bloco sem estar em condicional
         if(missing_endblocks < 0){
             Serial.println(F("[SEMANTIC] Erro: Fechou blocos sem poder"));
             error_flag = true;
-        } else if(qtd_conditions < 0){
-            Serial.println(F("[SEMANTIC] Erro: Fechou condicoes sem poder"));
+        } else if(qtd_conditions < 0){ // Isso nunca aconteceria, é só precaução, não há blocos de fechamento de condicional ainda
+            Serial.println(F("[SEMANTIC] Erro: Fechou condicoes sem poder")); // Isso nunca aconteceria, é só precaução, não há blocos de fechamento de condicional ainda
             error_flag = true; 
-        }else if(qtd_functions < 0){
+        }else if(qtd_functions < 0){ // Isso nunca aconteceria, é só precaução
             Serial.println(F("[SEMANTIC] Erro: Fechou funcoes sem poder"));
             error_flag = true; 
-        }
-
-        if(is_in_function){
-            // Não pode nada além de valor numérico dentro de função
-            if(!isNumberValue(token_da_vez) && !isFunction(token_da_vez) && !isEndFunction(token_da_vez)){
-                Serial.println(F("[SEMANTIC] Erro: Funcao aceita apenas valores numericos"));
-                error_flag = true; 
-            }
         }
 
         // Para o loop se encontrar erro
@@ -494,5 +515,28 @@ bool Syntax::ExpressionValidator(int tokens_in_condition[], int size_tokens_in_c
         Serial.print(F("[EXPRESSION] Sucesso: ")); Serial.println(result);
     }
     
+    return error_flag;
+}
+
+bool Syntax::FunctionValidator(int function_code, int function_args[], int tamanho){
+    bool error_flag = false;
+
+    switch(function_code){
+        case _DELAY:
+            Serial.println(F("[SEMANTIC] function_code == _DELAY"));
+
+            // Valida quantidade
+            if (tamanho > 1){
+                Serial.println(F("[SEMANTIC] Erro: Estouro de valores para essa função específica."));
+                error_flag = true;    
+            }
+
+            // Valida tipos
+            else if(!isNumberValue(function_args[0])){
+                Serial.println(F("[SEMANTIC] Erro: Valor de tipo errado"));
+                error_flag = true;
+            }
+        break;
+    }
     return error_flag;
 }
