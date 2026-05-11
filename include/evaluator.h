@@ -9,6 +9,7 @@
     public:
       int* sequencia;
       int pc; // Ponteiro de execução
+      int sp; // Ponteiro de condicional
       int qtd_tokens;
       bool is_loop;
       bool run = true;

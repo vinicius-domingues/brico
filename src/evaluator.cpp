@@ -7,6 +7,7 @@ Evaluator::Evaluator(int dados[], int tamanho, bool is_loop, Car* car){
    sequencia = dados;
    qtd_tokens = tamanho;
    pc = 0;
+   sp = 0;
    this->is_loop = is_loop;
    this->carrinho = car; 
    this->start_time = millis();
@@ -97,7 +98,6 @@ int Evaluator::Calculator(int var_method, int oper, int val){
     return result;
 }
 
-
 int Evaluator::CallMethod(int method_code, int args[], int size) {
     int result = GARBAGE;
 
@@ -135,7 +135,7 @@ int Evaluator::CallMethod(int method_code, int args[], int size) {
         case _PROXIMITY:
             Serial.println(F("[EVALUATOR] Acao ativada: Proximidade"));
             result = this->carrinho->Proximity();
-            Serial.println(F("[EVALUATOR] Resultador:"));
+            Serial.println(F("[EVALUATOR] Resultado do proximidade:"));
             Serial.println(result);
             break;
 
@@ -156,16 +156,7 @@ int Evaluator::CallFunction(int function_code, int args[], int size){
     switch(function_code){
         case _DELAY:
             Serial.println("[EXEC] Delay ativado.");
-
-            switch (args[0]){
-                case _ZERO:     function_value = 0;    break;
-                case _ONE:      function_value = 1;    break;
-                case _FIVE:     function_value = 5;    break;
-                case _FIFTY:    function_value = 50;   break;
-                case _THOUSAND: function_value = 1000; break;
-            }
-            delay(function_value * 1000);
-
+            delay(this->Casting(args[0]) * 1000);
             break;
     }
 
@@ -189,127 +180,139 @@ void Evaluator::Eval(){
     static int condition_pointer = 0;
     static int expression_pointer = 0;
     static int solved_counter = 0;
+    static int jumps = 0;
     
     static bool is_in_function = false;
     static bool is_in_condition = false;
+    static bool move_forward = false;
+    bool exists_and = false;
+    int sum_args = 0;
+    int value_args = 0;
     int token = sequencia[pc];
-    bool lazy = false;
 
-    Serial.println(F("[EVAL] [ TOKEN INIT ] --------------------------------------------------------------- "));
-    Serial.print(F("[EVAL] [ Token: ")); Serial.print(token); Serial.print(F("  //  Segundos: ")); Serial.print(this->getSeconds()); Serial.println(F(" ]"));
+    if(!move_forward){
+        Serial.println(F("[EVAL] [ TOKEN INIT ] --------------------------------------------------------------- "));
+        Serial.print(F("[EVAL] [ Token: ")); Serial.print(token); Serial.print(F("  //  Segundos: ")); Serial.print(this->getSeconds()); Serial.println(F(" ]"));
 
-    // Validador de funções 
-    if(isFunction(token)){
-        Serial.println(F(" [EVAL] [ FUNCTION INIT ] ----------------------------------------------------------- "));
-        is_in_function = true;
-        function_code = token;
+        // Validador de funções 
+        if(isFunction(token)){
+            Serial.println(F(" [EVAL] [ FUNCTION INIT ] ----------------------------------------------------------- "));
+            is_in_function = true;
+            function_code = token;
 
-    }else if(isEndFunction(token)){
-        result = 0;
-        is_in_function = false;
+        }else if(isEndFunction(token)){
+            result = 0;
+            is_in_function = false;
 
-        Serial.print(F("[EVAL] Função acabou // Função ativa é a: ")); Serial.println(function_code);
-        result = CallFunction(function_code, structure_args, structure_pointer);
+            Serial.print(F("[EVAL] Função acabou // Função ativa é a: ")); Serial.println(function_code);
+            result = CallFunction(function_code, structure_args, structure_pointer);
 
-        Serial.print(F("[EVAL] limpeza"));
-        function_code = GARBAGE;
-        for(int i = 0; i < structure_pointer ; i++){
-            structure_args[i] = GARBAGE;
-        }
-        structure_pointer = 0;
-        Serial.println(F("[EVAL] [ FUNCTION END ] ------------------------------------------------------------- "));
-        
-    } else if (is_in_function){
-        Serial.println(F("[EVAL] Armazenando valor de função"));
-        structure_args[structure_pointer] = token;
-        structure_pointer++;
-    }
-
-    // Validador de condições
-    if (isCondition(token)){
-        Serial.println(F("[EVAL] [ CONDITION INIT ] ----------------------------------------------------------- "));
-        is_in_condition = true;
-        condition_code = token;
-        
-    }else if(isEndCondition(token)){
-        result = 0;
-        Serial.println(F("[EVAL] Condição acabou"));
-        is_in_condition = false;
-
-        Serial.println(F("condition-args: "));
-        for(int l = 0; l < condition_pointer ; l++){      
-                Serial.println(condition_args[l]);
+            Serial.print(F("[EVAL] limpeza"));
+            function_code = GARBAGE;
+            for(int i = 0; i < structure_pointer ; i++){
+                structure_args[i] = GARBAGE;
             }
-
-        // For de resolver expressão
-        for(int j = 0; j < condition_pointer ; j++){
+            structure_pointer = 0;
+            Serial.println(F("[EVAL] [ FUNCTION END ] ------------------------------------------------------------- "));
             
-            // Se for bloco lógico ou fim da expressão
-            if(isLogical(condition_args[j]) || (j == condition_pointer - 1)){
-                Serial.println(F("Acabou a expressão"));
+        } else if (is_in_function){
+            Serial.println(F("[EVAL] Armazenando valor de função"));
+            structure_args[structure_pointer] = token;
+            structure_pointer++;
+        }
 
-                // Se for último de todos da condição
-                if (j == condition_pointer - 1 && !isLogical(condition_args[j])) {
+        // Validador de condições
+        if (isCondition(token)){
+            Serial.println(F("[EVAL] [ CONDITION INIT ] ----------------------------------------------------------- "));
+            is_in_condition = true;
+            condition_code = token;
+            sp = pc;
+            
+        }else if(isEndCondition(token)){
+            result = 0;
+            Serial.println(F("[EVAL] Condição acabou"));
+            is_in_condition = false;
+
+            // For de resolver expressão
+            for(int j = 0; j < condition_pointer ; j++){
+                
+                // Se for bloco lógico ou fim da expressão
+                if(isLogical(condition_args[j]) || (j == condition_pointer - 1)){
+                    Serial.println(F("Acabou a expressão"));
+
+                    // Se for último de todos da condição
+                    if (j == condition_pointer - 1 && !isLogical(condition_args[j])) {
+                        expression_args[expression_pointer] = condition_args[j];
+                        expression_pointer++;
+                    }
+
+                    solved_args[solved_counter] = (expression_pointer == 1) 
+                        ? this->Calculator(expression_args[0]) 
+                        : this->Calculator(expression_args[0], expression_args[1], expression_args[2]);
+
+                    solved_counter++;
+                    
+                    if(isLogical(condition_args[j])){ 
+                        Serial.println(F("Acrescenta valor lógico no solved_args"));
+                        solved_args[solved_counter] = condition_args[j];
+                        solved_counter++;
+                    }
+
+                    for(int i = 0 ; i < expression_pointer ; i++) {
+                        expression_args[i] = GARBAGE;
+                    }
+                    expression_pointer = 0; 
+
+                }else{
+                    Serial.println(F("Armazena enquanto não acabou a expressão"));
                     expression_args[expression_pointer] = condition_args[j];
                     expression_pointer++;
                 }
-
-          
-                solved_args[solved_counter] = (expression_pointer == 1) 
-                    ? this->Calculator(expression_args[0]) 
-                    : this->Calculator(expression_args[0], expression_args[1], expression_args[2]);
-
-                solved_counter++;
-                
-
-                if(isLogical(condition_args[j])){ 
-                    Serial.println(F("Acrescenta valor lógico no solved_args"));
-                    solved_args[solved_counter] = condition_args[j];
-                    solved_counter++;
-                }
-
-                for(int i=0; i < expression_pointer; i++) {
-                    expression_args[i] = GARBAGE;
-                }
-                expression_pointer = 0; 
-
-            }else{
-                Serial.println(F("Armazena enquanto não acabou a expressão"));
-                expression_args[expression_pointer] = condition_args[j];
-                expression_pointer++;
-            }
-
-
-
-            Serial.println(F("expression-args: "));
-            for(int l = 0; l < expression_pointer ; l++){
-                Serial.println(expression_args[l]);
             }
 
             Serial.println(F("solved-args: "));
-            for(int l = 0; l < solved_counter ; l++){
-                Serial.println(solved_args[l]);
+            for(int m = 0; m < solved_counter ; m++){
+                Serial.println(solved_args[m]);
+
+                if(solved_args[m] == _AND){
+                    exists_and = true;
+                }
+
+                if(solved_args[m] == 0 || solved_args[m] == 1){
+                    sum_args += solved_args[m];
+                    value_args++;
+                }
             }
+
+            // Limpeza Total da Condição
+            // condition_code = GARBAGE;
+            condition_pointer = 0;
+            solved_counter = 0; 
+
+            // Se existir AND, só de ter um falso já invalida tudo.
+            if(exists_and && sum_args != value_args){
+                move_forward = true;
+            }else if(!exists_and && sum_args < 1){
+                move_forward = true;
+            }
+            
+            Serial.println(F("[EVAL] [ CONDITION END ] ------------------------------------------------------------ "));
+
+            move_forward ? Serial.println(F("\n[EVAL] PASSA BATIDO NA CONDIÇÃO!")) : Serial.println(F("[EVAL] ENTRA NA CONDIÇÃO !"));;
+
+        }else if (is_in_condition){
+            Serial.println(F("[EVAL] Armazenando valor de condição"));
+            condition_args[condition_pointer] = token;
+            condition_pointer++;
         }
 
-        // Limpeza Total da Condição
-        function_code = GARBAGE;
-        condition_pointer = 0;
-        solved_counter = 0; // RESET CRÍTICO AQUI
-        
-        Serial.println(F("[EVAL] [ CONDITION END ] ------------------------------------------------------------ "));
-
-    }else if (is_in_condition){
-        Serial.println(F("[EVAL] Armazenando valor de condição"));
-        condition_args[condition_pointer] = token;
-        condition_pointer++;
+        // Executores de métodos void
+        if(isVoidMethod(token)){
+            result = this->CallMethod(token);
+        }
     }
 
-    // Executores de métodos void
-    if(isVoidMethod(token)){
-        result = this->CallMethod(token);
-    }
-    
+    // Controle do ponteiro de execução
     if(pc == (qtd_tokens - 1)){
         if(this->is_loop){
             pc = 0;
@@ -318,7 +321,30 @@ void Evaluator::Eval(){
         }
     }else{
         pc++;
-    }
 
-    Serial.println(F("[EVAL] [ TOKEN END ] ---------------------------------------------------------------- "));
+        // Se for fim de condição e for realmente o fechamento da condição raiz
+        if (isEndBlock(token) && jumps == 0){
+
+            // Se tava pulando (condição falsa), não volte mais
+            if(move_forward){
+                move_forward = false;
+            } else{
+                // Se for WHILE não tava pulando, por enquanto é verdade, volte.
+                if(condition_code == _WHILE){
+                    pc = sp;
+                }
+            }
+        }
+
+        // Se achar alguma condição aninhada, e estiver pulando
+        if(move_forward){
+            if (isCondition(token)){
+                jumps++;
+            }
+
+            if (isEndBlock(token)){
+                jumps--;
+            }
+        }
+    }   
 }

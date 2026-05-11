@@ -43,7 +43,7 @@ void loop() {
             
             // Testes apenas
             Serial.println(F("[MAIN] Rodando em modo de TESTE"));
-            int teste[] = {_START, _IF, _PROXIMITY, _AND, _PROXIMITY, _OR, _SEGUNDOS, _BIGGER, _FIFTY, _ENDCONDITION, _GREEN_LED, _ENDBLOCK, _RED_LED, _END};
+            int teste[] = {_START, _WHILE, _PROXIMITY, _EQUAL, _FALSE, _AND, _SEGUNDOS, _SMALLER, _FIVE, _ENDCONDITION, _GREEN_LED, _ENDBLOCK, _RED_LED, _END};
             blocks_read = sizeof(teste) / sizeof(teste[0]);
             memcpy(sequence, teste, sizeof(teste));
 

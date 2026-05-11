@@ -8,7 +8,7 @@ Car::Car(){
     pinMode(PIN_GREEN_LED, OUTPUT);
     pinMode(PIN_BLUE_LED, OUTPUT);
     
-    pinMode(PIN_SENSOR, INPUT);
+    pinMode(PIN_SENSOR, INPUT_PULLUP);
     
     digitalWrite(PIN_RED_LED, LOW);
     digitalWrite(PIN_GREEN_LED, LOW);
@@ -57,5 +57,5 @@ void Car::BlueLed() {
 
 bool Car::Proximity() {
     Serial.println(F("[CARRO] Leitura de Sensor: Proximidade"));
-    return(HIGH == digitalRead(PIN_SENSOR));
+    return(LOW == digitalRead(PIN_SENSOR));
 }
