@@ -9,7 +9,94 @@ Evaluator::Evaluator(int dados[], int tamanho, bool is_loop, Car* car){
    pc = 0;
    this->is_loop = is_loop;
    this->carrinho = car; 
+   this->start_time = millis();
 }
+
+unsigned long Evaluator::getSeconds() {
+    return (millis() - this->start_time) / 1000;
+}
+
+int Evaluator::Casting(int token){
+    int call_result = GARBAGE;
+
+    switch (token){
+
+    case _ZERO:
+        call_result = 0;
+        break;
+    
+    case _ONE:
+        call_result = 1;
+        break;
+
+    case _FIVE:
+        call_result = 5;
+        break;
+
+    case _FIFTY:
+        call_result = 50;
+        break;
+
+    case _THOUSAND:
+        call_result = 1000;
+        break;
+
+    case _TRUE:
+        call_result = true;
+        break;
+
+    case _FALSE:
+        call_result = false;
+        break;
+
+    case _SEGUNDOS:
+        call_result = this->getSeconds();
+        break;
+
+    }
+
+    return call_result;
+}
+
+int Evaluator::Calculator(int var_method, int oper, int val){
+    bool result = false;
+
+        if ( isMethod(var_method) ){
+            var_method = this->CallMethod(var_method);
+        }else{
+            var_method = this->Casting(var_method); // Se for seconds, dentro do casting será esperado.
+        }
+
+        // Método não void já calculado
+        if(oper == GARBAGE){
+            result = var_method;
+               
+        // Expressão composta
+        }else{
+            // Convertendo valor
+            if ( isMethod(val) ){
+                val = this->CallMethod(val);
+            }else{
+                val = this->Casting(val);
+            }
+
+            // Comparação final
+            switch (oper){
+                case _SMALLER:
+                    result = (var_method < val);
+                    break;
+                case _BIGGER:
+                    result = (var_method > val);
+                    break;
+                case _EQUAL:
+                    result = (var_method == val);
+                    break;
+            }     
+        }
+
+    return result;
+}
+
 
 int Evaluator::CallMethod(int method_code, int args[], int size) {
     int result = GARBAGE;
@@ -48,6 +135,8 @@ int Evaluator::CallMethod(int method_code, int args[], int size) {
         case _PROXIMITY:
             Serial.println(F("[EVALUATOR] Acao ativada: Proximidade"));
             result = this->carrinho->Proximity();
+            Serial.println(F("[EVALUATOR] Resultador:"));
+            Serial.println(result);
             break;
 
         default:
@@ -84,74 +173,152 @@ int Evaluator::CallFunction(int function_code, int args[], int size){
 }
 
 
-void Evaluator::Eval(unsigned long segundos){
+void Evaluator::Eval(){
     static const int function_limit = 4;
     static const int condition_limit = 50;
-    static int function_args[function_limit] = {GARBAGE};
+
+    static int structure_args[function_limit] = {GARBAGE};
     static int condition_args[condition_limit] = {GARBAGE};
+    static int expression_args[condition_limit] = {GARBAGE};
+    static int solved_args[condition_limit] = {GARBAGE};
     static int function_code = GARBAGE;
     static int condition_code = GARBAGE;
     static int result = GARBAGE;
-    static int function_pointer = 0;
+    
+    static int structure_pointer = 0;
     static int condition_pointer = 0;
+    static int expression_pointer = 0;
+    static int solved_counter = 0;
+    
     static bool is_in_function = false;
     static bool is_in_condition = false;
     int token = sequencia[pc];
-    bool error_flag = false;
+    bool lazy = false;
 
-    Serial.println("[EVAL] [ TOKEN INIT ] --------------------------------------------------------------- ");
-    Serial.print("[EVAL] [ Token: "); Serial.print(token); Serial.print("  //  Segundos: "); Serial.print(segundos); Serial.println(" ]");
+    Serial.println(F("[EVAL] [ TOKEN INIT ] --------------------------------------------------------------- "));
+    Serial.print(F("[EVAL] [ Token: ")); Serial.print(token); Serial.print(F("  //  Segundos: ")); Serial.print(this->getSeconds()); Serial.println(F(" ]"));
 
     // Validador de funções 
-    // Valida o começo da função, pegando qual função é e ativando a flag 'is_in_function'
     if(isFunction(token)){
-        Serial.println(" [EVAL] [ FUNCTION INIT ] --------------------------------------------------------------- ");
+        Serial.println(F(" [EVAL] [ FUNCTION INIT ] ----------------------------------------------------------- "));
         is_in_function = true;
         function_code = token;
 
-    // Se estiver em função, começa a armazenar os argumentos (máx 4) e valida se há estouro de argumentos (stack overflow)
     }else if(isEndFunction(token)){
         result = 0;
-        Serial.println("[EVAL] viu que função acabou");
         is_in_function = false;
 
-        // Executor de funções
-        Serial.print("[EVAL] função acabou e a função ativa é a: "); Serial.println(function_code);
-        result = CallFunction(function_code, function_args, function_pointer);
+        Serial.print(F("[EVAL] Função acabou // Função ativa é a: ")); Serial.println(function_code);
+        result = CallFunction(function_code, structure_args, structure_pointer);
 
-        // Limpeza para seguir o código
-        Serial.print("[EVAL] limpeza");
+        Serial.print(F("[EVAL] limpeza"));
         function_code = GARBAGE;
-        for(int i = 0; i < function_pointer ; i++){
-            function_args[i] = GARBAGE;
+        for(int i = 0; i < structure_pointer ; i++){
+            structure_args[i] = GARBAGE;
         }
-        function_pointer = 0;
-        Serial.println(" [EVAL] [ FUNCTION END ] --------------------------------------------------------------- ");
-    }else if (is_in_function){
-        Serial.println("[EVAL] viu que tá dentro da função, armazenou");
-        function_args[function_pointer] = token;
-        function_pointer++;
-    // Ao final da função, tira da flag de 'is_in_function' e começa a executar pois já armazenou todos os argumentos
+        structure_pointer = 0;
+        Serial.println(F("[EVAL] [ FUNCTION END ] ------------------------------------------------------------- "));
+        
+    } else if (is_in_function){
+        Serial.println(F("[EVAL] Armazenando valor de função"));
+        structure_args[structure_pointer] = token;
+        structure_pointer++;
     }
 
     // Validador de condições
+    if (isCondition(token)){
+        Serial.println(F("[EVAL] [ CONDITION INIT ] ----------------------------------------------------------- "));
+        is_in_condition = true;
+        condition_code = token;
         
-    // Executores de métodos void (Só passa o token e retorna GARBAGE)
+    }else if(isEndCondition(token)){
+        result = 0;
+        Serial.println(F("[EVAL] Condição acabou"));
+        is_in_condition = false;
+
+        Serial.println(F("condition-args: "));
+        for(int l = 0; l < condition_pointer ; l++){      
+                Serial.println(condition_args[l]);
+            }
+
+        // For de resolver expressão
+        for(int j = 0; j < condition_pointer ; j++){
+            
+            // Se for bloco lógico ou fim da expressão
+            if(isLogical(condition_args[j]) || (j == condition_pointer - 1)){
+                Serial.println(F("Acabou a expressão"));
+
+                // Se for último de todos da condição
+                if (j == condition_pointer - 1 && !isLogical(condition_args[j])) {
+                    expression_args[expression_pointer] = condition_args[j];
+                    expression_pointer++;
+                }
+
+          
+                solved_args[solved_counter] = (expression_pointer == 1) 
+                    ? this->Calculator(expression_args[0]) 
+                    : this->Calculator(expression_args[0], expression_args[1], expression_args[2]);
+
+                solved_counter++;
+                
+
+                if(isLogical(condition_args[j])){ 
+                    Serial.println(F("Acrescenta valor lógico no solved_args"));
+                    solved_args[solved_counter] = condition_args[j];
+                    solved_counter++;
+                }
+
+                for(int i=0; i < expression_pointer; i++) {
+                    expression_args[i] = GARBAGE;
+                }
+                expression_pointer = 0; 
+
+            }else{
+                Serial.println(F("Armazena enquanto não acabou a expressão"));
+                expression_args[expression_pointer] = condition_args[j];
+                expression_pointer++;
+            }
+
+
+
+            Serial.println(F("expression-args: "));
+            for(int l = 0; l < expression_pointer ; l++){
+                Serial.println(expression_args[l]);
+            }
+
+            Serial.println(F("solved-args: "));
+            for(int l = 0; l < solved_counter ; l++){
+                Serial.println(solved_args[l]);
+            }
+        }
+
+        // Limpeza Total da Condição
+        function_code = GARBAGE;
+        condition_pointer = 0;
+        solved_counter = 0; // RESET CRÍTICO AQUI
+        
+        Serial.println(F("[EVAL] [ CONDITION END ] ------------------------------------------------------------ "));
+
+    }else if (is_in_condition){
+        Serial.println(F("[EVAL] Armazenando valor de condição"));
+        condition_args[condition_pointer] = token;
+        condition_pointer++;
+    }
+
+    // Executores de métodos void
     if(isVoidMethod(token)){
         result = this->CallMethod(token);
     }
     
-    // Coordenador: Se o ponteiro estiver no último item lido e ainda não bateu em nenhum _END, é porque é LOOP, então volta para o começo (0)
     if(pc == (qtd_tokens - 1)){
         if(this->is_loop){
             pc = 0;
         }else{
             run = false;
         }
-    // Se não está no fim, avança ponteiro
     }else{
         pc++;
     }
 
-    Serial.println("[EVAL] [ TOKEN END ] --------------------------------------------------------------- ");
+    Serial.println(F("[EVAL] [ TOKEN END ] ---------------------------------------------------------------- "));
 }

@@ -197,9 +197,9 @@ bool Syntax::LookAhead(int sequence[], int blocks_used){
 
        // Token LÓGICO (11/11)
         else if(isLogical(token_da_vez)){
-            if(!isValue(proximo) && !isMethod(proximo) ){
+            if(!isVariable(proximo) && !isMethod(proximo) ){
                 result = 18;
-                Serial.println(F("[LOOKAHEAD] Erro 18: Operador Logico deve ser seguido por Valor ou Metodo"));
+                Serial.println(F("[LOOKAHEAD] Erro 18: Operador Logico deve ser seguido por Variável ou Metodo"));
                 error_flag = true;
             }
         }

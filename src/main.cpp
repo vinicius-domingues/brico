@@ -6,33 +6,25 @@
 #include "evaluator.h"
 
 Controller* arduino;
-Syntax* analisador;
-Car* carrinho;
-Evaluator* executor;
+Syntax*     analisador;
+Car*        carrinho;
+Evaluator*  executor;
 
 static const int blocks_limit = 100; // Limite de blocos no sistema
 int sequence[blocks_limit];          // Array de sequencia
 int blocks_read = 0;                 // Posições do array que foram usadas
-
 unsigned long brand_new_instant = 0;
 unsigned long seconds_running = 0;
-enum SystemState {
-    STATE_DEBUG,
-    STATE_COMPILE,
-    STATE_RUNNING
-};
-
+enum SystemState {STATE_DEBUG, STATE_COMPILE, STATE_RUNNING};
 SystemState currentState = STATE_DEBUG; 
 
 void setup() {
     Serial.begin(9600);
 
     Serial.println(" ");
-
-    arduino = new Controller();
-    carrinho = new Car();
-    analisador = new Syntax();
-
+        arduino = new Controller();
+        carrinho = new Car();
+        analisador = new Syntax();
     Serial.println(" ");
 }
 
@@ -51,7 +43,7 @@ void loop() {
             
             // Testes apenas
             Serial.println(F("[MAIN] Rodando em modo de TESTE"));
-            int teste[] = {_START, _RED_LED, _DELAY, _FIVE, _ENDFUNCTION, _GREEN_LED, _END};
+            int teste[] = {_START, _IF, _PROXIMITY, _AND, _PROXIMITY, _OR, _SEGUNDOS, _BIGGER, _FIFTY, _ENDCONDITION, _GREEN_LED, _ENDBLOCK, _RED_LED, _END};
             blocks_read = sizeof(teste) / sizeof(teste[0]);
             memcpy(sequence, teste, sizeof(teste));
 
@@ -90,19 +82,8 @@ void loop() {
         }
 
         case STATE_RUNNING: {
-            unsigned long actual_instant = millis();
-
-            // Incrementa nossa variável 'Segundos', com no mínimo de taxa de atualização de 1 segundo
-            if (actual_instant - brand_new_instant >= 1000) {
-                Serial.println(F("[EVAL] +1s."));
-                seconds_running += (actual_instant - brand_new_instant) / 1000;           
-                brand_new_instant = actual_instant; 
-            }
-
-            // Executa até voltar para esperar outro eventual código
             if (executor->run) {
-                Serial.println(F("[EVAL] Rodando"));
-                executor->Eval(seconds_running);
+                executor->Eval();
             } else {
                 Serial.println(F("\n[MAIN] Fim do script alcançado! Execução do carrinho concluída.    //    Retornando ao console de depuração..."));
                 delete analisador; 
