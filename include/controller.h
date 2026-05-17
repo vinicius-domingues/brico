@@ -23,6 +23,9 @@ class Controller{
     void Prepare();   // Prepara o shift register
     void transmitI2C(byte slaveAddress); // Comunica com o atuador
     void Stop();      // Só para o código naquele trecho para sempre
+    void setupSegDisplay();         // Configura os pinos do display 7 segmentos como OUTPUT
+    void ShowState(int stateIndex); // Exibe uma letra no display 7 segmentos
+    void ShowError(int errorCode);  // Exibe 'E' + código (3 dígitos) e aguarda botão
 
   private:
     byte readEEPROM(int address); // Le a EEPROM (a mando do debug menu)

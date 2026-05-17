@@ -2,6 +2,80 @@
 #include <tokens.h>
 #include <errors.h>
 
+// ===========================================================================
+// TABELAS DO DISPLAY 7 SEGMENTOS
+// Ordem dos segmentos: { A, B, C, D, E, F, G }
+// 1 = Ligado, 0 = Desligado (Cátodo Comum)
+// ===========================================================================
+
+// --- Letras de estado (índices SEG_STATE_*) ---
+static const byte letrasEstado[5][7] = {
+  {0, 1, 1, 1, 1, 0, 1},  // 0: 'd' (Debug)      -> B, C, D, E, G
+  {1, 0, 0, 1, 1, 1, 0},  // 1: 'C' (Compilando) -> A, D, E, F
+  {0, 0, 0, 0, 1, 0, 1},  // 2: 'r' (Running)    -> E, G
+  {1, 0, 0, 1, 1, 1, 1},  // 3: 'E' (Error)      -> A, D, E, F, G
+  {0, 0, 0, 1, 1, 1, 0}   // 4: 'L' (Listening)  -> D, E, F
+};
+
+// --- Dígitos numéricos 0-9 ---
+static const byte digitos[10][7] = {
+//  A  B  C  D  E  F  G
+  { 1, 1, 1, 1, 1, 1, 0 },  // 0
+  { 0, 1, 1, 0, 0, 0, 0 },  // 1
+  { 1, 1, 0, 1, 1, 0, 1 },  // 2
+  { 1, 1, 1, 1, 0, 0, 1 },  // 3
+  { 0, 1, 1, 0, 0, 1, 1 },  // 4
+  { 1, 0, 1, 1, 0, 1, 1 },  // 5
+  { 1, 0, 1, 1, 1, 1, 1 },  // 6
+  { 1, 1, 1, 0, 0, 0, 0 },  // 7
+  { 1, 1, 1, 1, 1, 1, 1 },  // 8
+  { 1, 1, 1, 1, 0, 1, 1 },  // 9
+};
+
+// --- Mapa de pinos de segmento {A, B, C, D, E, F, G} ---
+static const byte segPins[7] = {
+  PIN_SEG_A, PIN_SEG_B, PIN_SEG_C, PIN_SEG_D,
+  PIN_SEG_E, PIN_SEG_F, PIN_SEG_G
+};
+
+// --- Mapa de pinos de seleção de dígito (DIG1 = mais à esquerda) ---
+static const byte digPins[SEG_DIGITS] = {
+  PIN_DIG_1, PIN_DIG_2, PIN_DIG_3, PIN_DIG_4
+};
+
+// ---------------------------------------------------------------------------
+// Helper interno: escreve um padrão de 7 segmentos e ativa o dígito pedido
+// ---------------------------------------------------------------------------
+static void _writeDigit(int digIndex, const byte pattern[7]) {
+    // Apaga todos os dígitos antes de trocar (evita ghosting)
+    for (int d = 0; d < SEG_DIGITS; d++) {
+        digitalWrite(digPins[d], HIGH); // HIGH = dígito desligado (cátodo comum)
+    }
+    // Escreve o padrão de segmentos
+    for (int s = 0; s < 7; s++) {
+        digitalWrite(segPins[s], pattern[s] ? HIGH : LOW);
+    }
+    // Ativa apenas o dígito desejado
+    digitalWrite(digPins[digIndex], LOW); // LOW = dígito ligado (cátodo comum)
+}
+
+// ---------------------------------------------------------------------------
+// setupSegDisplay
+// ---------------------------------------------------------------------------
+void Controller::setupSegDisplay() {
+    // Configura pinos de segmento
+    for (int i = 0; i < 7; i++) {
+        pinMode(segPins[i], OUTPUT);
+        digitalWrite(segPins[i], LOW);
+    }
+    // Configura pinos de seleção de dígito (HIGH = desligado no cátodo comum)
+    for (int d = 0; d < SEG_DIGITS; d++) {
+        pinMode(digPins[d], OUTPUT);
+        digitalWrite(digPins[d], HIGH);
+    }
+    Serial.println(F("[DISPLAY] Pinos do 7 segmentos configurados."));
+}
+
 
 Controller::Controller() {
     Wire.begin(); 
@@ -314,9 +388,72 @@ void Controller::Mapper(int sequence[], int& blocks_used) {
         Serial.println(F("[I2C] Transmissao para o Slave 8 concluida com sucesso!"));
     }
     Serial.println(F("=================================================="));
-
-
-
-
-
 }
+
+void Controller::ShowState(int stateIndex) {
+    // Guarda de índice inválido
+    if (stateIndex < 0 || stateIndex > 4) {
+        Serial.print(F("[DISPLAY] Erro: indice invalido para ShowState: "));
+        Serial.println(stateIndex);
+        return;
+    }
+
+    // Exibe o padrão no dígito 1 (único dígito para estados simples)
+    _writeDigit(0, letrasEstado[stateIndex]);
+
+    Serial.print(F("[DISPLAY] ShowState -> indice "));
+    Serial.println(stateIndex);
+}
+
+void Controller::ShowError(int errorCode) {
+    Serial.print(F("[DISPLAY] ShowError -> codigo "));
+    Serial.println(errorCode);
+
+    // Decompoe o codigo em 3 digitos (maximo 999 para um codigo de 3 digitos)
+    int cod = (errorCode >= 0 && errorCode <= 999) ? errorCode : 999;
+    int centenas = cod / 100;
+    int dezenas  = (cod % 100) / 10;
+    int unidades = cod % 10;
+
+    // Monta o array de padroes para os 4 digitos: [E, centenas, dezenas, unidades]
+    const byte* padroes[SEG_DIGITS] = {
+        letrasEstado[SEG_STATE_ERROR], // Digito 1: 'E'
+        digitos[centenas],             // Digito 2: centenas
+        digitos[dezenas],              // Digito 3: dezenas
+        digitos[unidades]              // Digito 4: unidades
+    };
+
+    Serial.println(F("[DISPLAY] Aguardando botao para continuar..."));
+
+    // Garante que o botao nao esteja ja pressionado antes de comecar a esperar
+    while (digitalRead(PIN_BUTTON) == LOW) {
+        // Continua multiplexando enquanto o botao permanece pressionado
+        for (int d = 0; d < SEG_DIGITS; d++) {
+            _writeDigit(d, padroes[d]);
+            delay(SEG_MUX_DELAY_MS);
+        }
+    }
+
+    // Espera o botao ser pressionado (LOW) — multiplexando o display enquanto isso
+    while (digitalRead(PIN_BUTTON) == HIGH) {
+        for (int d = 0; d < SEG_DIGITS; d++) {
+            _writeDigit(d, padroes[d]);
+            delay(SEG_MUX_DELAY_MS);
+        }
+    }
+
+    // Espera o botao ser solto (debounce)
+    while (digitalRead(PIN_BUTTON) == LOW) {
+        for (int d = 0; d < SEG_DIGITS; d++) {
+            _writeDigit(d, padroes[d]);
+            delay(SEG_MUX_DELAY_MS);
+        }
+    }
+
+    // Apaga todos os digitos ao sair
+    for (int d = 0; d < SEG_DIGITS; d++) {
+        digitalWrite(digPins[d], HIGH);
+    }
+
+    Serial.println(F("[DISPLAY] Botao pressionado. Retornando ao Debug."));
+}

@@ -66,14 +66,43 @@
     #define _NUMERIC -200
     #define _VOID -300    
 
-    // Hardware
+    // Hardware — Controller
     #define PIN_BUTTON 5 
     #define PIN_CLOCK 6
     #define PIN_SET 7
     #define I2C 8
     #define EEPROM_ADDR_0 0x50 
     #define EEPROM_ADDR_1 0x51
+
+    // Hardware — Display 7 segmentos (pinos A0-A6 usados como digitais 14-20)
+    // Ordem dos segmentos: { A,  B,  C,  D,  E,  F,  G }
+    #define PIN_SEG_A  14  // A0
+    #define PIN_SEG_B  15  // A1
+    #define PIN_SEG_C  16  // A2
+    #define PIN_SEG_D  17  // A3
+    #define PIN_SEG_E  18  // A4
+    #define PIN_SEG_F  19  // A5
+    #define PIN_SEG_G  20  // A6 (somente leitura no Uno — usar Mega ou substituir por digital livre)
+
+    // Seleção de dígito — cátodo comum: LOW ativa o dígito
+    // Ajuste os pinos conforme seu hardware
+    #define PIN_DIG_1  2   // Dígito 1 (mais à esquerda) — exibe 'E'
+    #define PIN_DIG_2  3   // Dígito 2 — centenas do código de erro
+    #define PIN_DIG_3  4   // Dígito 3 — dezenas  do código de erro
+    #define PIN_DIG_4  13  // Dígito 4 — unidades  do código de erro
+    #define SEG_DIGITS 4   // Total de dígitos no display
+
+    // Tempo de cada dígito ativo durante o multiplexing (ms)
+    #define SEG_MUX_DELAY_MS 3
+
+    // Índices de estado do display 7 segmentos (tabela letrasEstado)
+    #define SEG_STATE_DEBUG     0  // 'd'
+    #define SEG_STATE_COMPILE   1  // 'C'
+    #define SEG_STATE_RUNNING   2  // 'r'
+    #define SEG_STATE_ERROR     3  // 'E'
+    #define SEG_STATE_LISTENING 4  // 'L'
 #endif
+
 
 // 1 - Ações e Sensores (Separados para corrigir erros semânticos)
 inline bool isVoidMethod(int t)    { return (t >= _BRAKE && t <= _BLUE_LED); } 

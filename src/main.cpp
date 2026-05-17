@@ -25,16 +25,20 @@ void setup() {
         arduino = new Controller();
         carrinho = new Car();
         analisador = new Syntax();
+        arduino->setupSegDisplay();
+        arduino->ShowState(SEG_STATE_DEBUG);
     Serial.println(" ");
 }
 
 void loop() {
     switch (currentState) {
         case STATE_DEBUG:
+            arduino->ShowState(SEG_STATE_DEBUG);
             arduino->DebugMenu();
             currentState = STATE_COMPILE;
 
         case STATE_COMPILE: {
+            arduino->ShowState(SEG_STATE_COMPILE);
             int error_stage = 0; 
 
             // arduino->Listener();
@@ -43,7 +47,7 @@ void loop() {
             
             // Testes apenas
             Serial.println(F("[MAIN] Rodando em modo de TESTE"));
-            int teste[] = {_START, _WHILE, _PROXIMITY, _EQUAL, _FALSE, _AND, _SEGUNDOS, _SMALLER, _FIVE, _ENDCONDITION, _GREEN_LED, _ENDBLOCK, _RED_LED, _END};
+            int teste[] = {_START, _WHILE, _PROXIMITY, _EQUAL, _FALSE, _AND, _SMALLER, _FIVE, _ENDCONDITION, _GREEN_LED, _ENDBLOCK, _RED_LED, _END};
             // int teste[] = {_START, _WHILE, _SEGUNDOS, _SMALLER, _FIFTY, _ENDCONDITION, _WHILE, _SEGUNDOS, _SMALLER, _FIVE, _ENDCONDITION, _RED_LED, _ENDBLOCK, _GREEN_LED, _ENDBLOCK, _BLUE_LED, _END};
             // int teste[] = {_START, _WHILE, _SEGUNDOS, _SMALLER, _FIVE, _ENDCONDITION, _RED_LED, _ENDBLOCK, _GREEN_LED, _END};
             blocks_read = sizeof(teste) / sizeof(teste[0]);
@@ -59,7 +63,7 @@ void loop() {
 
             // Controle de transição com base no resultado
             if (error_stage == 0) {
-                Serial.println(F("[MAIN] Sem erros. Passando código validado via UART."));
+                Serial.println(F("[MAIN] Sem erros. Passando codigo validado via UART."));
 
                 // Passaria via UART. Não terá aqui o Evaluator nem o Executor
                     // Passamos: Sequencia uma a uma e se é loop ou não (o tamanho da sequencia n precisa pois isso pode ser feito no EvaL)
@@ -71,13 +75,15 @@ void loop() {
                 executor = new Evaluator(sequence, blocks_read, arduino->is_loop, carrinho);
                 
                 currentState = STATE_RUNNING; 
-
-                Serial.println(F("[MAIN] Avaliação começando."));
+                arduino->ShowState(SEG_STATE_RUNNING);
+                Serial.println(F("[MAIN] Avaliacao comecando."));
                 
             } else {
-                Serial.println(F("[MAIN] Voltando ao Debug devido a erros."));
+                // Exibe 'E' + codigo no display e trava ate o botao ser pressionado
+                arduino->ShowError(analisador->result);
+                // Continua para DEBUG somente apos confirmacao do usuario
                 if (analisador != nullptr) { delete analisador; }
-                if (executor != nullptr) { delete executor; }
+                if (executor != nullptr)  { delete executor; }
                 currentState = STATE_DEBUG; 
             }
             break;
