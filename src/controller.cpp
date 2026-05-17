@@ -1,5 +1,6 @@
 #include "Controller.h"
 #include <tokens.h>
+#include <errors.h>
 
 
 Controller::Controller() {
@@ -173,7 +174,7 @@ void Controller::Mapper(int sequence[], int& blocks_used) {
     Prepare();
 
     // Loop de varredura (controlado pelo tamanho máximo da RAM)
-    while (blocks_used < 100) {
+    while (blocks_used < 100) {  // Overflow → ERR_HW_SHIFT_OVERFLOW (503)
         
         // Dá o clock para o Shift Register avançar o estado ativo para a próxima peça
         physical_clocks++; // Registra que o bastão andou um passo físico
@@ -307,8 +308,11 @@ void Controller::Mapper(int sequence[], int& blocks_used) {
         
         delay(100); // Intervalo REAL no barramento I2C
     }
-    Wire.endTransmission();
-    Serial.println(F("[I2C] Transmissão para o Slave 8 concluída com sucesso!"));
+    if (Wire.endTransmission() != 0) {
+        Serial.println(F("[I2C] Erro 500: Falha na transmissao I2C (ERR_HW_I2C_FALHA)"));
+    } else {
+        Serial.println(F("[I2C] Transmissao para o Slave 8 concluida com sucesso!"));
+    }
     Serial.println(F("=================================================="));
 
 
