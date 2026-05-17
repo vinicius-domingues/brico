@@ -65,23 +65,19 @@ int Evaluator::Calculator(int var_method, int oper, int val){
         if ( isMethod(var_method) ){
             var_method = this->CallMethod(var_method);
         }else{
-            var_method = this->Casting(var_method); // Se for seconds, dentro do casting será esperado.
+            var_method = this->Casting(var_method);
         }
 
-        // Método não void já calculado
         if(oper == GARBAGE){
             result = var_method;
                
-        // Expressão composta
         }else{
-            // Convertendo valor
             if ( isMethod(val) ){
                 val = this->CallMethod(val);
             }else{
                 val = this->Casting(val);
             }
 
-            // Comparação final
             switch (oper){
                 case _SMALLER:
                     result = (var_method < val);
@@ -150,7 +146,6 @@ int Evaluator::CallMethod(int method_code, int args[], int size) {
 
 
 int Evaluator::CallFunction(int function_code, int args[], int size){
-    int function_value = GARBAGE;
     int result = GARBAGE;
 
     switch(function_code){
@@ -166,37 +161,43 @@ int Evaluator::CallFunction(int function_code, int args[], int size){
 
 void Evaluator::Eval(){
     static const int function_limit = 4;
-    static const int condition_limit = 50;
+    static const int condition_limit = 40;
 
     static int structure_args[function_limit] = {GARBAGE};
     static int condition_args[condition_limit] = {GARBAGE};
     static int expression_args[condition_limit] = {GARBAGE};
     static int solved_args[condition_limit] = {GARBAGE};
+
+    // Pilha de retorno: guarda PC e tipo de condição de cada nível aninhado
+    static int condition_comeback_pc[condition_limit]   = {GARBAGE};
+    static int condition_comeback_code[condition_limit] = {GARBAGE};
+    static int repetition_counter = 0;
+
     static int function_code = GARBAGE;
-    static int condition_code = GARBAGE;
     static int result = GARBAGE;
     
     static int structure_pointer = 0;
     static int condition_pointer = 0;
     static int expression_pointer = 0;
     static int solved_counter = 0;
-    static int jumps = 0;
+    // move_forward_depth: 0 = executando normalmente
+    // >0 = pulando N níveis de bloco (cada WHILE/IF falso empilha +1, cada ENDBLOCK desempilha -1)
+    static int move_forward_depth = 0;
     
     static bool is_in_function = false;
     static bool is_in_condition = false;
-    static bool move_forward = false;
     bool exists_and = false;
     int sum_args = 0;
     int value_args = 0;
     int token = sequencia[pc];
 
-    if(!move_forward){
+    if(move_forward_depth == 0){
         Serial.println(F("[EVAL] [ TOKEN INIT ] --------------------------------------------------------------- "));
         Serial.print(F("[EVAL] [ Token: ")); Serial.print(token); Serial.print(F("  //  Segundos: ")); Serial.print(this->getSeconds()); Serial.println(F(" ]"));
 
         // Validador de funções 
         if(isFunction(token)){
-            Serial.println(F(" [EVAL] [ FUNCTION INIT ] ----------------------------------------------------------- "));
+            Serial.println(F("[EVAL] [ FUNCTION INIT ] ----------------------------------------------------------- "));
             is_in_function = true;
             function_code = token;
 
@@ -207,7 +208,6 @@ void Evaluator::Eval(){
             Serial.print(F("[EVAL] Função acabou // Função ativa é a: ")); Serial.println(function_code);
             result = CallFunction(function_code, structure_args, structure_pointer);
 
-            Serial.print(F("[EVAL] limpeza"));
             function_code = GARBAGE;
             for(int i = 0; i < structure_pointer ; i++){
                 structure_args[i] = GARBAGE;
@@ -225,22 +225,24 @@ void Evaluator::Eval(){
         if (isCondition(token)){
             Serial.println(F("[EVAL] [ CONDITION INIT ] ----------------------------------------------------------- "));
             is_in_condition = true;
-            condition_code = token;
-            sp = pc;
+
+            // Salva PC e tipo da condição na pilha
+            condition_comeback_pc[repetition_counter]   = pc;
+            condition_comeback_code[repetition_counter] = token;
+            repetition_counter++;
+            Serial.print(F("[EVAL] Salvando PC de retorno: "));
+            Serial.println(pc);
             
         }else if(isEndCondition(token)){
             result = 0;
             Serial.println(F("[EVAL] Condição acabou"));
             is_in_condition = false;
 
-            // For de resolver expressão
             for(int j = 0; j < condition_pointer ; j++){
                 
-                // Se for bloco lógico ou fim da expressão
                 if(isLogical(condition_args[j]) || (j == condition_pointer - 1)){
                     Serial.println(F("Acabou a expressão"));
 
-                    // Se for último de todos da condição
                     if (j == condition_pointer - 1 && !isLogical(condition_args[j])) {
                         expression_args[expression_pointer] = condition_args[j];
                         expression_pointer++;
@@ -284,22 +286,26 @@ void Evaluator::Eval(){
                 }
             }
 
-            // Limpeza Total da Condição
-            // condition_code = GARBAGE;
             condition_pointer = 0;
             solved_counter = 0; 
 
-            // Se existir AND, só de ter um falso já invalida tudo.
-            if(exists_and && sum_args != value_args){
-                move_forward = true;
-            }else if(!exists_and && sum_args < 1){
-                move_forward = true;
+            // Se condição FALSA: incrementa depth para começar a pular este bloco
+            bool condition_false = false;
+            if(exists_and && sum_args != value_args){ condition_false = true; }
+            else if(!exists_and && sum_args < 1){     condition_false = true; }
+
+            if(condition_false){
+                move_forward_depth++;
+                repetition_counter--;
+                condition_comeback_pc[repetition_counter]   = GARBAGE;
+                condition_comeback_code[repetition_counter] = GARBAGE;
+                Serial.print(F("[EVAL] Condição falsa — pulando bloco, depth: "));
+                Serial.println(move_forward_depth);
             }
-            
+
             Serial.println(F("[EVAL] [ CONDITION END ] ------------------------------------------------------------ "));
-
-            move_forward ? Serial.println(F("\n[EVAL] PASSA BATIDO NA CONDIÇÃO!")) : Serial.println(F("[EVAL] ENTRA NA CONDIÇÃO !"));;
-
+            Serial.print(F("[EVAL] move_forward_depth: ")); Serial.println(move_forward_depth);
+            
         }else if (is_in_condition){
             Serial.println(F("[EVAL] Armazenando valor de condição"));
             condition_args[condition_pointer] = token;
@@ -320,30 +326,40 @@ void Evaluator::Eval(){
             run = false;
         }
     }else{
+        Serial.print(F("[EVAL] Incrementando PC: ")); Serial.println(pc);
         pc++;
 
-        // Se for fim de condição e for realmente o fechamento da condição raiz
-        if (isEndBlock(token) && jumps == 0){
-
-            // Se tava pulando (condição falsa), não volte mais
-            if(move_forward){
-                move_forward = false;
-            } else{
-                // Se for WHILE não tava pulando, por enquanto é verdade, volte.
-                if(condition_code == _WHILE){
-                    pc = sp;
+        // Enquanto pulando (depth > 0): rastreia blocos aninhados para não sair cedo
+        if(move_forward_depth > 0){
+            if(isCondition(token)){
+                move_forward_depth++; // bloco aninhado dentro do bloco que estamos pulando
+                Serial.print(F("[EVAL] Bloco aninhado encontrado ao pular, depth: "));
+                Serial.println(move_forward_depth);
+            }
+            if(isEndBlock(token)){
+                move_forward_depth--;
+                Serial.print(F("[EVAL] ENDBLOCK ao pular, depth agora: "));
+                Serial.println(move_forward_depth);
+                // Se chegou a 0, saímos do bloco que estava sendo pulado — continua normalmente
+            }
+        } else {
+            // Executando normalmente — trata ENDBLOCK
+            if(isEndBlock(token)){
+                // Consulta o topo da pilha para saber o tipo da condição deste bloco
+                if(condition_comeback_code[repetition_counter - 1] == _WHILE){
+                    Serial.print(F("[EVAL] WHILE verdadeiro — voltando para PC: "));
+                    Serial.println(condition_comeback_pc[repetition_counter - 1]);
+                    pc = condition_comeback_pc[repetition_counter - 1];
+                    // Desempilha — o WHILE vai se reempilhar quando o PC chegar nele novamente
+                    repetition_counter--;
+                    condition_comeback_pc[repetition_counter]   = GARBAGE;
+                    condition_comeback_code[repetition_counter] = GARBAGE;
+                } else {
+                    // IF ou outra condição sem repetição — descarta o topo da pilha
+                    repetition_counter--;
+                    condition_comeback_pc[repetition_counter]   = GARBAGE;
+                    condition_comeback_code[repetition_counter] = GARBAGE;
                 }
-            }
-        }
-
-        // Se achar alguma condição aninhada, e estiver pulando
-        if(move_forward){
-            if (isCondition(token)){
-                jumps++;
-            }
-
-            if (isEndBlock(token)){
-                jumps--;
             }
         }
     }   
