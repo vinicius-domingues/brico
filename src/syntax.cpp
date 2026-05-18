@@ -46,6 +46,7 @@ bool Syntax::Parser(int sequence[], int blocks_used){
                 result = ERR_SYN_COND_FALTA;
                 Serial.println(F("[PARSER] Erro 202: Faltam fechamentos condicionais"));
             }
+            error_position = -1; // Erro de balanceamento global — sem posição única
             error_flag = true;
         }
     }
@@ -59,6 +60,7 @@ bool Syntax::Parser(int sequence[], int blocks_used){
                 result = ERR_SYN_BLOCO_FALTA;
                 Serial.println(F("[PARSER] Erro 204: Faltam fechamentos de bloco"));
             }
+            error_position = -1;
             error_flag = true;
         }
     }
@@ -72,6 +74,7 @@ bool Syntax::Parser(int sequence[], int blocks_used){
                 result = ERR_SYN_FUNC_FALTA;
                 Serial.println(F("[PARSER] Erro 206: Faltam fechamentos de funcao"));
             }
+            error_position = -1;
             error_flag = true;
         }
     } 
@@ -108,10 +111,12 @@ bool Syntax::LookAhead(int sequence[], int blocks_used){
                 result = ERR_SYN_START_DUPLO;
                 Serial.println(F("[LOOKAHEAD] Erro 210: INICIO seguido de INICIO vazio"));
                 error_flag = true;
+                error_position = i;
             }else if(!isCondition(proximo) && !isMethod(proximo) && !isFunction(proximo) && proximo != _END){
                 result = ERR_SYN_START_INVALIDO;
                 Serial.println(F("[LOOKAHEAD] Erro 211: INICIO deve ser seguido por Condicao, Metodo ou Funcao"));
                 error_flag = true;
+                error_position = i;
             }
         }
 
@@ -121,6 +126,7 @@ bool Syntax::LookAhead(int sequence[], int blocks_used){
                 result = ERR_SYN_COND_PROXIMO;
                 Serial.println(F("[LOOKAHEAD] Erro 212: Condicao deve ser seguida por Metodo, Variavel ou INICIO"));
                 error_flag = true;
+                error_position = i;
             }
         }
         
@@ -130,6 +136,7 @@ bool Syntax::LookAhead(int sequence[], int blocks_used){
                 result = ERR_SYN_OPER_PROXIMO;
                 Serial.println(F("[LOOKAHEAD] Erro 213: Operador deve ser seguido por Metodo ou Valor"));
                 error_flag = true;
+                error_position = i;
             }
         }
 
@@ -139,6 +146,7 @@ bool Syntax::LookAhead(int sequence[], int blocks_used){
                 result = ERR_SYN_MET_PROXIMO;
                 Serial.println(F("[LOOKAHEAD] Erro 214: Metodo nao pode ser seguido por METODO, VARIAVEL ou VALOR"));
                 error_flag = true;
+                error_position = i;
             }
         }
 
@@ -148,6 +156,7 @@ bool Syntax::LookAhead(int sequence[], int blocks_used){
                 result = ERR_SYN_FUNC_PROXIMO;
                 Serial.println(F("[LOOKAHEAD] Erro 215: Funcao deve ser seguida por INICIO ou Valor"));
                 error_flag = true;
+                error_position = i;
             }
         }
 
@@ -157,6 +166,7 @@ bool Syntax::LookAhead(int sequence[], int blocks_used){
                 result = ERR_SYN_VALOR_PROXIMO;
                 Serial.println(F("[LOOKAHEAD] Erro 216: Valor deve ser seguido por Logico, valor ou Fechamento de funcao/condicao"));
                 error_flag = true;
+                error_position = i;
             }
         }
 
@@ -166,6 +176,7 @@ bool Syntax::LookAhead(int sequence[], int blocks_used){
                 result = ERR_SYN_VAR_PROXIMO;
                 Serial.println(F("[LOOKAHEAD] Erro 217: Variavel deve ser seguida por Operacao ou INICIO"));
                 error_flag = true;
+                error_position = i;
             }
         }
 
@@ -175,6 +186,7 @@ bool Syntax::LookAhead(int sequence[], int blocks_used){
                 result = ERR_SYN_ENDCOND_PROXIMO;
                 Serial.println(F("[LOOKAHEAD] Erro 218: Proximo token invalido apos Fechar Condicao"));
                 error_flag = true;
+                error_position = i;
             }
         }
 
@@ -184,6 +196,7 @@ bool Syntax::LookAhead(int sequence[], int blocks_used){
                 result = ERR_SYN_ENDBLOCO_PROXIMO;
                 Serial.println(F("[LOOKAHEAD] Erro 219: Proximo token invalido apos Fechar Bloco"));
                 error_flag = true;
+                error_position = i;
             }
         }
 
@@ -193,6 +206,7 @@ bool Syntax::LookAhead(int sequence[], int blocks_used){
                 result = ERR_SYN_ENDFUNC_PROXIMO;
                 Serial.println(F("[LOOKAHEAD] Erro 220: Proximo token invalido apos Fechar Funcao"));
                 error_flag = true;
+                error_position = i;
             }
         }
 
@@ -202,6 +216,7 @@ bool Syntax::LookAhead(int sequence[], int blocks_used){
                 result = ERR_SYN_LOGICO_PROXIMO;
                 Serial.println(F("[LOOKAHEAD] Erro 221: Operador Logico deve ser seguido por Variavel ou Metodo"));
                 error_flag = true;
+                error_position = i;
             }
         }
 
@@ -210,6 +225,8 @@ bool Syntax::LookAhead(int sequence[], int blocks_used){
             Serial.print(token_da_vez);
             Serial.print(F(" / "));
             Serial.println(proximo);
+            Serial.print(F("[LOOKAHEAD] Posicao do erro: "));
+            Serial.println(error_position);
             break;
         }
     }
@@ -252,6 +269,7 @@ bool Syntax::Semantic(int sequence[], int blocks_used){
                 } else {
                         result = ERR_SEM_COND_OVERFLOW;
                         Serial.println(F("[SEMANTIC] Erro 301: Condicao complexa demais (Overflow)"));
+                        error_position = i;
                         error_flag = true;
                         break;
                 }
@@ -264,10 +282,12 @@ bool Syntax::Semantic(int sequence[], int blocks_used){
                 //Limpezas
 
                 // Antes de limpar, joga para analisar lexicamente
+                // error_position já é setado dentro de ExpressionValidator via this->
                 error_flag = Syntax::ExpressionValidator(tokens_in_condition_space, saving_token);
                 
                 // Se encontrou erro de expressão, já para tudo
                 if(error_flag){
+                    error_position = i; // posição do fechamento da condição que revelou o problema
                     break;
                 }else{ // Limpa para continuar para a próxima condição
                     for(int k = 0 ; k < condition_spaces ; k++) {
@@ -308,6 +328,7 @@ bool Syntax::Semantic(int sequence[], int blocks_used){
 
             // Valida se os tipos e a quantidade de argumentos está certa
             error_flag = this->FunctionValidator(function_code, function_args, function_pointer);
+            if(error_flag){ error_position = i; }
             
             // Limpeza
             function_code = GARBAGE;
@@ -323,6 +344,7 @@ bool Syntax::Semantic(int sequence[], int blocks_used){
             if(!isNumberValue(token_da_vez) && !isFunction(token_da_vez) && !isEndFunction(token_da_vez)){
                 result = ERR_SEM_FUNC_TIPO_INVALIDO;
                 Serial.println(F("[SEMANTIC] Erro 312: Funcao aceita apenas valores numericos"));
+                error_position = i;
                 error_flag = true; 
             }
 
@@ -336,6 +358,7 @@ bool Syntax::Semantic(int sequence[], int blocks_used){
             if(function_pointer > function_spaces){
                 result = ERR_SEM_FUNC_OVERFLOW;
                 Serial.println(F("[SEMANTIC] Erro 313: Estouro de valores."));
+                error_position = i;
                 error_flag = true;
             }
         }
@@ -347,14 +370,17 @@ bool Syntax::Semantic(int sequence[], int blocks_used){
             if(isOperation(token_da_vez)){
                 result = ERR_SEM_OPER_FORA_COND;
                 Serial.println(F("[SEMANTIC] Erro 316: Operacoes devem estar dentro de condicoes"));
+                error_position = i;
                 error_flag = true;
             }else if(isLogical(token_da_vez)){
                 result = ERR_SEM_LOGICO_FORA_COND;
                 Serial.println(F("[SEMANTIC] Erro 317: Logicos (E/OU) devem estar dentro de condicoes"));
+                error_position = i;
                 error_flag = true;   
             }else if(isNonVoidMethod(token_da_vez)){
                 result = ERR_SEM_MET_NONVOID_FORA;
                 Serial.println(F("[SEMANTIC] Erro 318: Acoes (metodos) nao nulos devem estar dentro de condicoes"));
+                error_position = i;
                 error_flag = true;   
             }
         }
@@ -363,14 +389,17 @@ bool Syntax::Semantic(int sequence[], int blocks_used){
         if(missing_endblocks < 0){
             result = ERR_SEM_BLOCO_SEM_COND;
             Serial.println(F("[SEMANTIC] Erro 319: Fechou blocos sem poder"));
+            error_position = i;
             error_flag = true;
         } else if(qtd_conditions < 0){ // Isso nunca aconteceria, é só precaução
             result = ERR_SEM_COND_SEM_ABERTURA;
             Serial.println(F("[SEMANTIC] Erro 320: Fechou condicoes sem poder"));
+            error_position = i;
             error_flag = true; 
         }else if(qtd_functions < 0){ // Isso nunca aconteceria, é só precaução
             result = ERR_SEM_FUNC_SEM_ABERTURA;
             Serial.println(F("[SEMANTIC] Erro 321: Fechou funcoes sem poder"));
+            error_position = i;
             error_flag = true; 
         }
 
@@ -378,6 +407,8 @@ bool Syntax::Semantic(int sequence[], int blocks_used){
         if(error_flag){
             Serial.print(F("[SEMANTIC] Falha: "));
             Serial.println(result);
+            Serial.print(F("[SEMANTIC] Posicao do erro: "));
+            Serial.println(error_position);
             break;
         }
     }

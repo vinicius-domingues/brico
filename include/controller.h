@@ -26,6 +26,7 @@ class Controller{
     void setupSegDisplay();         // Configura os pinos do display 7 segmentos como OUTPUT
     void ShowState(int stateIndex); // Exibe uma letra no display 7 segmentos
     void ShowError(int errorCode);  // Exibe 'E' + código (3 dígitos) e aguarda botão
+    void IlluminateBlock(int errorBlockIndex); // Acende LED vermelho no bloco com erro; demais ficam verdes
 
   private:
     byte readEEPROM(int address); // Le a EEPROM (a mando do debug menu)

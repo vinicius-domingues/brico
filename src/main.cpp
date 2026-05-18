@@ -80,6 +80,8 @@ void loop() {
                 Serial.println(F("[MAIN] Avaliacao comecando."));
                 
             } else {
+                // Ilumina o bloco fisico com erro em vermelho
+                arduino->IlluminateBlock(analisador->error_position);
                 // Exibe 'E' + codigo no display e trava ate o botao ser pressionado
                 arduino->ShowError(analisador->result);
                 // Continua para DEBUG somente apos confirmacao do usuario

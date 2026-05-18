@@ -9,6 +9,7 @@ class Syntax {
         int result = 0; // success
         int* tokens;
         int total;
+        int error_position;
 
         //Syntax();
         bool Parser(int sequence[], int blocks_used);

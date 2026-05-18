@@ -78,6 +78,15 @@
     #define EEPROM_ADDR_0 0x50 
     #define EEPROM_ADDR_1 0x51
 
+    // Hardware — LEDs dos blocos físicos
+    // TODO: definir pinos reais quando o hardware estiver pronto
+    // Cada bloco tem um LED bicolor (verde = normal, vermelho = erro)
+    // Sugestão: controle via shift register nos pinos abaixo
+    #define PIN_BLOCK_LED_DATA   -1  // Pino de dados serial para os LEDs dos blocos (INDEFINIDO)
+    #define PIN_BLOCK_LED_CLOCK  -1  // Pino de clock serial para os LEDs dos blocos (INDEFINIDO)
+    #define PIN_BLOCK_LED_LATCH  -1  // Pino de latch para os LEDs dos blocos          (INDEFINIDO)
+    #define BLOCK_LED_MAX        100  // Número máximo de blocos suportados
+
     // Hardware — Display 7 segmentos (pinos A0-A6 usados como digitais 14-20)
     // Ordem dos segmentos: { A,  B,  C,  D,  E,  F,  G }
     #define PIN_SEG_A  14  // A0

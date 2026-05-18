@@ -451,3 +451,42 @@ void Controller::ShowError(int errorCode) {
 
     Serial.println(F("[DISPLAY] Botao pressionado. Retornando ao Debug."));
 }
+
+void Controller::IlluminateBlock(int errorBlockIndex) {
+    Serial.print(F("[BLOCK_LED] IlluminateBlock -> bloco com erro: "));
+    Serial.println(errorBlockIndex);
+
+    // Guarda: índice inválido apaga todos
+    if (errorBlockIndex < 0 || errorBlockIndex >= BLOCK_LED_MAX) {
+        Serial.println(F("[BLOCK_LED] Indice invalido — apagando todos os LEDs."));
+        errorBlockIndex = -1;
+    }
+
+#if (PIN_BLOCK_LED_DATA != -1) && (PIN_BLOCK_LED_CLOCK != -1) && (PIN_BLOCK_LED_LATCH != -1)
+    // Baixa o latch para começar a transmissão
+    digitalWrite(PIN_BLOCK_LED_LATCH, LOW);
+
+    // Envia um byte por bloco: 0 = verde, 1 = vermelho
+    // O shift register empilha os bits — o último enviado sai primeiro
+    for (int b = BLOCK_LED_MAX - 1; b >= 0; b--) {
+        byte ledState = (b == errorBlockIndex) ? 1 : 0; // 1 = vermelho, 0 = verde
+
+        digitalWrite(PIN_BLOCK_LED_DATA, ledState ? HIGH : LOW);
+
+        // Pulso de clock para empurrar o bit
+        digitalWrite(PIN_BLOCK_LED_CLOCK, HIGH);
+        delayMicroseconds(5);
+        digitalWrite(PIN_BLOCK_LED_CLOCK, LOW);
+        delayMicroseconds(5);
+    }
+
+    // Sobe o latch para aplicar os valores nos LEDs
+    digitalWrite(PIN_BLOCK_LED_LATCH, HIGH);
+
+    Serial.println(F("[BLOCK_LED] LEDs atualizados via shift register."));
+#else
+    // TODO: PIN_BLOCK_LED_DATA, PIN_BLOCK_LED_CLOCK e PIN_BLOCK_LED_LATCH
+    // ainda nao estao definidos em tokens.h — IlluminateBlock esta em modo stub.
+    Serial.println(F("[BLOCK_LED] STUB: pinos nao definidos. Defina PIN_BLOCK_LED_DATA, _CLOCK e _LATCH em tokens.h"));
+#endif
+}
