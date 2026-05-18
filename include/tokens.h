@@ -87,6 +87,12 @@
     #define PIN_BLOCK_LED_LATCH  -1  // Pino de latch para os LEDs dos blocos          (INDEFINIDO)
     #define BLOCK_LED_MAX        100  // Número máximo de blocos suportados
 
+    // Cores dos LEDs dos blocos físicos
+    #define BLOCK_COLOR_OFF    0  // Apagado
+    #define BLOCK_COLOR_GREEN  1  // Verde  (bloco avaliado sem erro)
+    #define BLOCK_COLOR_YELLOW 2  // Amarelo (bloco sendo avaliado agora)
+    #define BLOCK_COLOR_RED    3  // Vermelho (bloco com erro / erro global)
+
     // Hardware — Display 7 segmentos (pinos A0-A6 usados como digitais 14-20)
     // Ordem dos segmentos: { A,  B,  C,  D,  E,  F,  G }
     #define PIN_SEG_A  14  // A0
@@ -114,7 +120,6 @@
     #define SEG_STATE_RUNNING   2  // 'r'
     #define SEG_STATE_ERROR     3  // 'E'
     #define SEG_STATE_LISTENING 4  // 'L'
-#endif
 
 
 // 1 - Ações e Sensores (Separados para corrigir erros semânticos)
@@ -158,3 +163,5 @@ inline int getType(int t) {
     // -1 = Sem tipo (void)
     return _VOID; 
 } 
+
+#endif // TOKENS_H

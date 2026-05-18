@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 #include <Wire.h>
-
+#include <tokens.h>
 
 
 class Controller{
@@ -26,10 +26,13 @@ class Controller{
     void setupSegDisplay();         // Configura os pinos do display 7 segmentos como OUTPUT
     void ShowState(int stateIndex); // Exibe uma letra no display 7 segmentos
     void ShowError(int errorCode);  // Exibe 'E' + código (3 dígitos) e aguarda botão
-    void IlluminateBlock(int errorBlockIndex); // Acende LED vermelho no bloco com erro; demais ficam verdes
+    void IlluminateBlock(int blockIndex, byte color); // Atualiza cor de um bloco e envia ao hardware
+    void ResetBlockLeds();           // Apaga todos os LEDs dos blocos
 
   private:
-    byte readEEPROM(int address); // Le a EEPROM (a mando do debug menu)
+    byte readEEPROM(int address);
+    void FlushBlockLeds();           // Envia blockLedState[] ao hardware via shift register
+    byte blockLedState[BLOCK_LED_MAX]; // Estado atual de cor de cada bloco
 };
 
 #endif

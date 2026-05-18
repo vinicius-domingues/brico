@@ -10,6 +10,11 @@ Syntax*     analisador;
 Car*        carrinho;
 Evaluator*  executor;
 
+// Ponte global: repassa o callback do Syntax para o IlluminateBlock do Controller
+static void _blockLedBridge(int blockIndex, byte color) {
+    if (arduino != nullptr) arduino->IlluminateBlock(blockIndex, color);
+}
+
 static const int blocks_limit = 100; // Limite de blocos no sistema
 int sequence[blocks_limit];          // Array de sequencia
 int blocks_read = 0;                 // Posições do array que foram usadas
@@ -39,6 +44,7 @@ void loop() {
 
         case STATE_COMPILE: {
             arduino->ShowState(SEG_STATE_COMPILE);
+            arduino->ResetBlockLeds(); // Apaga todos os LEDs antes de comecar a varredura
             int error_stage = 0; 
 
             // arduino->Listener();
@@ -53,6 +59,9 @@ void loop() {
             int teste[] = {_START, _RED_LED, _DELAY, _ONE, _ENDFUNCTION, _GREEN_LED, _DELAY, _ONE, _ENDFUNCTION, _BLUE_LED, _DELAY, _ONE, _ENDFUNCTION,_START}; // , _GREEN_LED, _DELAY, _ONE, _ENDFUNCTION, _GREEN_LED, _DELAY, _ONE, _ENDFUNCTION, _START};
             blocks_read = sizeof(teste) / sizeof(teste[0]);
             memcpy(sequence, teste, sizeof(teste));
+
+            // Conecta callback de LEDs ao analisador
+            analisador->onBlockLed = _blockLedBridge;
 
             if (analisador->Parser(sequence, blocks_read)) {
                 error_stage++;
@@ -80,11 +89,9 @@ void loop() {
                 Serial.println(F("[MAIN] Avaliacao comecando."));
                 
             } else {
-                // Ilumina o bloco fisico com erro em vermelho
-                arduino->IlluminateBlock(analisador->error_position);
+                // LEDs ja foram atualizados pelo callback dentro do Syntax
                 // Exibe 'E' + codigo no display e trava ate o botao ser pressionado
                 arduino->ShowError(analisador->result);
-                // Continua para DEBUG somente apos confirmacao do usuario
                 if (analisador != nullptr) { delete analisador; }
                 if (executor != nullptr)  { delete executor; }
                 currentState = STATE_DEBUG; 
