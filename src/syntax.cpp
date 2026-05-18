@@ -312,6 +312,11 @@ bool Syntax::Semantic(int sequence[], int blocks_used){
             // Limpeza
             function_code = GARBAGE;
 
+            for(int l = 0 ; l < function_pointer ; l++){
+                function_args[l] = GARBAGE;
+            }
+                
+            function_pointer = 0;
 
         }else if(is_in_function){
             // Não pode nada além de valor numérico dentro de função

@@ -319,9 +319,40 @@ void Evaluator::Eval(){
     }
 
     // Controle do ponteiro de execução
-    if(pc == (qtd_tokens - 1)){
-        if(this->is_loop){
+    if((token == _START && pc > 0) || (token == _END)){
+        if(token == _START){
+            Serial.println(F("[EVAL] Loop: reiniciando execucao do inicio."));
+
+            // Reseta PC
             pc = 0;
+
+            // Reseta pilha de condições/WHILE
+            for(int i = 0; i < condition_limit; i++){
+                condition_comeback_pc[i]   = GARBAGE;
+                condition_comeback_code[i] = GARBAGE;
+                condition_args[i]          = GARBAGE;
+                expression_args[i]         = GARBAGE;
+                solved_args[i]             = GARBAGE;
+            }
+            repetition_counter = 0;
+
+            // Reseta contexto de função
+            for(int i = 0; i < function_limit; i++){
+                structure_args[i] = GARBAGE;
+            }
+            function_code     = GARBAGE;
+            structure_pointer = 0;
+
+            // Reseta ponteiros e contadores de condição
+            condition_pointer  = 0;
+            expression_pointer = 0;
+            solved_counter     = 0;
+
+            // Reseta flags e depth
+            move_forward_depth = 0;
+            is_in_function     = false;
+            is_in_condition    = false;
+
         }else{
             run = false;
         }

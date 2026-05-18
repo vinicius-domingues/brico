@@ -21,21 +21,13 @@
     #define _EQUAL 10
     #define _BIGGER 11
     #define _SMALLER 12
+    #define _NOT 13
 
     // Lógico
     #define _AND 20
     #define _OR 21
 
-    // Método: Void (Intervalo: 30 a 35)
-    #define _BRAKE 30       // Comando para freiar                  (VOID)
-    #define _ACCELERATE 31  // Comando para acelerar                (VOID)
-    #define _HONK 32        // Comando para buzinar                 (VOID)
-    #define _RED_LED 33     // Comando para acender led vermelho    (VOID)
-    #define _GREEN_LED 34   // Comando para acender led verde       (VOID)
-    #define _BLUE_LED 35    // Comando para acender led azul        (VOID)
 
-    // Método: Não void (Intervalo isolado)
-    #define _PROXIMITY 40   // Comando para ler sensor
 
     // Função
     #define _DELAY 50
@@ -65,6 +57,18 @@
     #define _BOOLEAN -100
     #define _NUMERIC -200
     #define _VOID -300    
+
+    
+    // Método: Não void (Intervalo isolado)
+    #define _PROXIMITY 40   // Comando para ler sensor
+
+    // Método: Void (Intervalo: 30 a 35)
+    #define _BRAKE 30       // Comando para freiar                  (VOID)
+    #define _ACCELERATE 31  // Comando para acelerar                (VOID)
+    #define _HONK 32        // Comando para buzinar                 (VOID)
+    #define _RED_LED 33     // Comando para acender led vermelho    (VOID)
+    #define _GREEN_LED 34   // Comando para acender led verde       (VOID)
+    #define _BLUE_LED 35    // Comando para acender led azul        (VOID)
 
     // Hardware — Controller
     #define PIN_BUTTON 5 
@@ -117,7 +121,7 @@ inline bool isBooleanValue(int t)  { return (t >= _TRUE && t <= _FALSE); }
 inline bool isNumberValue(int t)   { return (t >= _ZERO && t <= _THOUSAND); }
 
 // 3 - Operadores
-inline bool isOperation(int t)     { return (t >= _EQUAL && t <= _SMALLER); } 
+inline bool isOperation(int t)     { return (t >= _EQUAL && t <= _NOT); } 
 inline bool isLogical(int t)       { return (t >= _AND && t <= _OR); }        
 
 // 4 - Estruturas e Funções

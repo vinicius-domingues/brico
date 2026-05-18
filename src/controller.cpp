@@ -2,12 +2,6 @@
 #include <tokens.h>
 #include <errors.h>
 
-// ===========================================================================
-// TABELAS DO DISPLAY 7 SEGMENTOS
-// Ordem dos segmentos: { A, B, C, D, E, F, G }
-// 1 = Ligado, 0 = Desligado (Cátodo Comum)
-// ===========================================================================
-
 // --- Letras de estado (índices SEG_STATE_*) ---
 static const byte letrasEstado[5][7] = {
   {0, 1, 1, 1, 1, 0, 1},  // 0: 'd' (Debug)      -> B, C, D, E, G
@@ -423,7 +417,7 @@ void Controller::ShowError(int errorCode) {
         digitos[unidades]              // Digito 4: unidades
     };
 
-    Serial.println(F("[DISPLAY] Aguardando botao para continuar..."));
+    Serial.println(F("[DISPLAY] Aperte o botao para retomar"));
 
     // Garante que o botao nao esteja ja pressionado antes de comecar a esperar
     while (digitalRead(PIN_BUTTON) == LOW) {
@@ -456,4 +450,4 @@ void Controller::ShowError(int errorCode) {
     }
 
     Serial.println(F("[DISPLAY] Botao pressionado. Retornando ao Debug."));
-}
+}
