@@ -88,6 +88,9 @@ int Evaluator::Calculator(int var_method, int oper, int val){
                 case _EQUAL:
                     result = (var_method == val);
                     break;
+                case _NOT:
+                    result = (var_method != val);
+                    break;
             }     
         }
 
