@@ -10,10 +10,10 @@ Syntax*     analisador;
 Car*        carrinho;
 Evaluator*  executor;
 
-// Ponte global: repassa o callback do Syntax para o IlluminateBlock do Controller
-static void _blockLedBridge(int blockIndex, byte color) {
-    if (arduino != nullptr) arduino->IlluminateBlock(blockIndex, color);
-}
+// [BLOCK_LED DESATIVADO] Ponte global: repassa o callback do Syntax para IlluminateBlock
+// static void _blockLedBridge(int blockIndex, byte color) {
+//     if (arduino != nullptr) arduino->IlluminateBlock(blockIndex, color);
+// }
 
 static const int blocks_limit = 100; // Limite de blocos no sistema
 int sequence[blocks_limit];          // Array de sequencia
@@ -44,7 +44,7 @@ void loop() {
 
         case STATE_COMPILE: {
             arduino->ShowState(SEG_STATE_COMPILE);
-            arduino->ResetBlockLeds(); // Apaga todos os LEDs antes de comecar a varredura
+            // arduino->ResetBlockLeds(); // [BLOCK_LED DESATIVADO] Apaga todos os LEDs antes de comecar a varredura
             int error_stage = 0; 
 
             // arduino->Listener();
@@ -56,12 +56,23 @@ void loop() {
             // int teste[] = {_START, _WHILE, _PROXIMITY, _EQUAL, _FALSE, _AND, _SMALLER, _FIVE, _ENDCONDITION, _GREEN_LED, _ENDBLOCK, _RED_LED, _END};
             // int teste[] = {_START, _WHILE, _SEGUNDOS, _SMALLER, _FIFTY, _ENDCONDITION, _WHILE, _SEGUNDOS, _SMALLER, _FIVE, _ENDCONDITION, _RED_LED, _ENDBLOCK, _GREEN_LED, _ENDBLOCK, _BLUE_LED, _START};
             // int teste[] = {_START, _WHILE, _SEGUNDOS, _SMALLER, _FIVE, _ENDCONDITION, _RED_LED, _ENDBLOCK, _GREEN_LED, _END};
-            int teste[] = {_START, _RED_LED, _DELAY, _ONE, _ENDFUNCTION, _GREEN_LED, _DELAY, _ONE, _ENDFUNCTION, _BLUE_LED, _DELAY, _ONE, _ENDFUNCTION,_START}; // , _GREEN_LED, _DELAY, _ONE, _ENDFUNCTION, _GREEN_LED, _DELAY, _ONE, _ENDFUNCTION, _START};
+            // int teste[] = {_START, _RED_LED, _DELAY, _ONE, _ENDFUNCTION, _GREEN_LED, _DELAY, _ONE, _ENDFUNCTION, _BLUE_LED, _DELAY, _ONE, _ENDFUNCTION,_START}; // , _GREEN_LED, _DELAY, _ONE, _ENDFUNCTION, _GREEN_LED, _DELAY, _ONE, _ENDFUNCTION, _START};
+
+            // Lógica Pedro
+            // int teste[] = {_START, _GREEN_LED, _WHILE, _FIVE, _TRUE, _ENDCONDITION, _RED_LED, _ENDBLOCK};
+
+            // l2
+            // int teste[] = {_START, _GREEN_LED, _WHILE, _SEGUNDOS, _EQUAL, _FIVE, _ENDCONDITION, _RED_LED, _ENDBLOCK};
+
+            // L3
+            // int teste[] = {_START, _WHILE, _SEGUNDOS, _EQUAL, _FIVE, _ENDCONDITION,  _GREEN_LED, _RED_LED, _ENDBLOCK};
+
+            int teste[] = {_START, _RED_LED, _DELAY, _FIVE, _ENDFUNCTION, _GREEN_LED, _DELAY, _FIVE, _ENDFUNCTION, _BLUE_LED, _DELAY, _FIVE, _ENDFUNCTION, _START};
             blocks_read = sizeof(teste) / sizeof(teste[0]);
             memcpy(sequence, teste, sizeof(teste));
 
-            // Conecta callback de LEDs ao analisador
-            analisador->onBlockLed = _blockLedBridge;
+
+            // analisador->onBlockLed = _blockLedBridge; // [BLOCK_LED DESATIVADO]
 
             if (analisador->Parser(sequence, blocks_read)) {
                 error_stage++;

@@ -13,11 +13,11 @@ bool Syntax::Parser(int sequence[], int blocks_used){
         for(int i = 0 ; i < blocks_used ; i++){
             token_da_vez = sequence[i];
 
-            // Animacao: bloco atual = amarelo, anterior = verde
-            if(onBlockLed){
-                if(i > 0) onBlockLed(i - 1, BLOCK_COLOR_GREEN);
-                onBlockLed(i, BLOCK_COLOR_YELLOW);
-            }
+            // [BLOCK_LED DESATIVADO] Animacao: bloco atual = amarelo, anterior = verde
+            // if(onBlockLed){
+            //     if(i > 0) onBlockLed(i - 1, BLOCK_COLOR_GREEN);
+            //     onBlockLed(i, BLOCK_COLOR_YELLOW);
+            // }
 
             switch (token_da_vez) {
                 
@@ -53,7 +53,7 @@ bool Syntax::Parser(int sequence[], int blocks_used){
                 Serial.println(F("[PARSER] Erro 202: Faltam fechamentos condicionais"));
             }
             error_position = -1;
-            if(onBlockLed) { for(int j=0; j<blocks_used; j++) onBlockLed(j, BLOCK_COLOR_RED); }
+            // if(onBlockLed) { for(int j=0; j<blocks_used; j++) onBlockLed(j, BLOCK_COLOR_RED); } // [BLOCK_LED DESATIVADO]
             error_flag = true;
         }
     }
@@ -68,7 +68,7 @@ bool Syntax::Parser(int sequence[], int blocks_used){
                 Serial.println(F("[PARSER] Erro 204: Faltam fechamentos de bloco"));
             }
             error_position = -1;
-            if(onBlockLed) { for(int j=0; j<blocks_used; j++) onBlockLed(j, BLOCK_COLOR_RED); }
+            // if(onBlockLed) { for(int j=0; j<blocks_used; j++) onBlockLed(j, BLOCK_COLOR_RED); } // [BLOCK_LED DESATIVADO]
             error_flag = true;
         }
     }
@@ -83,7 +83,7 @@ bool Syntax::Parser(int sequence[], int blocks_used){
                 Serial.println(F("[PARSER] Erro 206: Faltam fechamentos de funcao"));
             }
             error_position = -1;
-            if(onBlockLed) { for(int j=0; j<blocks_used; j++) onBlockLed(j, BLOCK_COLOR_RED); }
+            // if(onBlockLed) { for(int j=0; j<blocks_used; j++) onBlockLed(j, BLOCK_COLOR_RED); } // [BLOCK_LED DESATIVADO]
             error_flag = true;
         }
     } 
@@ -108,11 +108,11 @@ bool Syntax::LookAhead(int sequence[], int blocks_used){
         
         token_da_vez = sequence[i];
 
-        // Animacao: bloco atual = amarelo, anterior = verde
-        if(onBlockLed){
-            if(i > 0) onBlockLed(i - 1, BLOCK_COLOR_GREEN);
-            onBlockLed(i, BLOCK_COLOR_YELLOW);
-        }
+        // [BLOCK_LED DESATIVADO] Animacao: bloco atual = amarelo, anterior = verde
+        // if(onBlockLed){
+        //     if(i > 0) onBlockLed(i - 1, BLOCK_COLOR_GREEN);
+        //     onBlockLed(i, BLOCK_COLOR_YELLOW);
+        // }
 
         if (i + 1 < blocks_used){
             proximo = sequence[i + 1];
@@ -236,7 +236,7 @@ bool Syntax::LookAhead(int sequence[], int blocks_used){
         }
 
         if(error_flag){
-            if(onBlockLed) onBlockLed(i, BLOCK_COLOR_RED);
+            // if(onBlockLed) onBlockLed(i, BLOCK_COLOR_RED); // [BLOCK_LED DESATIVADO]
             Serial.print(F("[LOOKAHEAD] Atual/Prox: "));
             Serial.print(token_da_vez);
             Serial.print(F(" / "));
@@ -275,11 +275,11 @@ bool Syntax::Semantic(int sequence[], int blocks_used){
     for (int i = 0; i < blocks_used ; i++) {
         token_da_vez = sequence[i];
 
-        // Animacao: bloco atual = amarelo, anterior = verde
-        if(onBlockLed){
-            if(i > 0) onBlockLed(i - 1, BLOCK_COLOR_GREEN);
-            onBlockLed(i, BLOCK_COLOR_YELLOW);
-        }
+        // [BLOCK_LED DESATIVADO] Animacao: bloco atual = amarelo, anterior = verde
+        // if(onBlockLed){
+        //     if(i > 0) onBlockLed(i - 1, BLOCK_COLOR_GREEN);
+        //     onBlockLed(i, BLOCK_COLOR_YELLOW);
+        // }
 
         // Se abertura de condições maior que zero, está em uma condição
         if(qtd_conditions > 0){
@@ -427,7 +427,7 @@ bool Syntax::Semantic(int sequence[], int blocks_used){
 
         // Para o loop se encontrar erro
         if(error_flag){
-            if(onBlockLed) onBlockLed(i, BLOCK_COLOR_RED);
+            // if(onBlockLed) onBlockLed(i, BLOCK_COLOR_RED); // [BLOCK_LED DESATIVADO]
             Serial.print(F("[SEMANTIC] Falha: "));
             Serial.println(result);
             Serial.print(F("[SEMANTIC] Posicao do erro: "));
