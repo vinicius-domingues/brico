@@ -70,56 +70,50 @@
     #define _GREEN_LED 34   // Comando para acender led verde       (VOID)
     #define _BLUE_LED 35    // Comando para acender led azul        (VOID)
 
-    // Hardware — Controller
-    #define PIN_BUTTON 5 
-    #define PIN_CLOCK 6
-    #define PIN_SET 7
+    // ============================================================
+    // PINOS DA CAIXA (alinhados com esp32_receiver(2).ino)
+    // ============================================================
+    #define PIN_BUTTON      4   // Botão de leitura (INPUT_PULLUP)
+    #define PIN_UART_RX     16  // Serial2 RX — recebe dados do carrinho
+    #define PIN_UART_TX     17  // Serial2 TX — envia dados ao carrinho
+    #define PIN_LED_STRIP   23  // Fita NeoPixel (status da caixa)
+    #define PIN_DATA_IN     18  // Leitura bit-bang dos blocos físicos
+
+    // Aliases de compatibilidade (usados internamente pelo Controller)
+    #define PIN_CLOCK  PIN_UART_RX  // Pino 16 — anteriormente clock do shift register
+    #define PIN_SET    PIN_UART_TX  // Pino 17 — anteriormente set do shift register
+
     #define I2C 8
-    #define EEPROM_ADDR_0 0x50 
+    #define EEPROM_ADDR_0 0x50
     #define EEPROM_ADDR_1 0x51
 
+    // Hardware — Protocolo bit-bang (recepção de blocos via pino digital)
+    // Usado principalmente pelo Mapper() e seus métodos auxiliares
+    #define BITBANG_BIT_TIME_US       1000   // Duração de cada bit em microssegundos
+    #define BITBANG_SOF               0xA5   // Byte de Start-of-Frame do protocolo
+    #define BITBANG_MAX_IDS           16     // Máximo de blocos (ids) por pacote
+    #define BITBANG_LINE_TIMEOUT_MS   10000  // Timeout para aguardar linha em idle HIGH
+    #define BITBANG_FRAME_TIMEOUT_MS  7000   // Timeout de frame completo
+    #define BITBANG_BYTE_TIMEOUT_MS   100    // Timeout de byte individual
+
     // Hardware — LEDs dos blocos físicos
-    // TODO: definir pinos reais quando o hardware estiver pronto
-    // Cada bloco tem um LED bicolor (verde = normal, vermelho = erro)
-    // Sugestão: controle via shift register nos pinos abaixo
-    #define PIN_BLOCK_LED_DATA   -1  // Pino de dados serial para os LEDs dos blocos (INDEFINIDO)
-    #define PIN_BLOCK_LED_CLOCK  -1  // Pino de clock serial para os LEDs dos blocos (INDEFINIDO)
-    #define PIN_BLOCK_LED_LATCH  -1  // Pino de latch para os LEDs dos blocos          (INDEFINIDO)
-    #define BLOCK_LED_MAX        100  // Número máximo de blocos suportados
+    #define PIN_BLOCK_LED_DATA   -1  // (INDEFINIDO)
+    #define PIN_BLOCK_LED_CLOCK  -1  // (INDEFINIDO)
+    #define PIN_BLOCK_LED_LATCH  -1  // (INDEFINIDO)
+    #define BLOCK_LED_MAX        100
 
     // Cores dos LEDs dos blocos físicos
-    #define BLOCK_COLOR_OFF    0  // Apagado
-    #define BLOCK_COLOR_GREEN  1  // Verde  (bloco avaliado sem erro)
-    #define BLOCK_COLOR_YELLOW 2  // Amarelo (bloco sendo avaliado agora)
-    #define BLOCK_COLOR_RED    3  // Vermelho (bloco com erro / erro global)
+    #define BLOCK_COLOR_OFF    0
+    #define BLOCK_COLOR_GREEN  1
+    #define BLOCK_COLOR_YELLOW 2
+    #define BLOCK_COLOR_RED    3
 
-    // Hardware — Display 7 segmentos (pinos A0-A6 usados como digitais 14-20)
-    // Ordem dos segmentos: { A,  B,  C,  D,  E,  F,  G }
-    #define PIN_SEG_A  14  // A0
-    #define PIN_SEG_B  15  // A1
-    #define PIN_SEG_C  16  // A2
-    #define PIN_SEG_D  17  // A3
-    #define PIN_SEG_E  18  // A4
-    #define PIN_SEG_F  19  // A5
-    #define PIN_SEG_G  20  // A6 (somente leitura no Uno — usar Mega ou substituir por digital livre)
-
-    // Seleção de dígito — cátodo comum: LOW ativa o dígito
-    // Ajuste os pinos conforme seu hardware
-    #define PIN_DIG_1  2   // Dígito 1 (mais à esquerda) — exibe 'E'
-    #define PIN_DIG_2  3   // Dígito 2 — centenas do código de erro
-    #define PIN_DIG_3  4   // Dígito 3 — dezenas  do código de erro
-    #define PIN_DIG_4  13  // Dígito 4 — unidades  do código de erro
-    #define SEG_DIGITS 4   // Total de dígitos no display
-
-    // Tempo de cada dígito ativo durante o multiplexing (ms)
-    #define SEG_MUX_DELAY_MS 3
-
-    // Índices de estado do display 7 segmentos (tabela letrasEstado)
-    #define SEG_STATE_DEBUG     0  // 'd'
-    #define SEG_STATE_COMPILE   1  // 'C'
-    #define SEG_STATE_RUNNING   2  // 'r'
-    #define SEG_STATE_ERROR     3  // 'E'
-    #define SEG_STATE_LISTENING 4  // 'L'
+    // Índices de estado (usados nas chamadas ShowState() em main.cpp)
+    #define SEG_STATE_DEBUG     0
+    #define SEG_STATE_COMPILE   1
+    #define SEG_STATE_RUNNING   2
+    #define SEG_STATE_ERROR     3
+    #define SEG_STATE_LISTENING 4
 
 
 // 1 - Ações e Sensores (Separados para corrigir erros semânticos)

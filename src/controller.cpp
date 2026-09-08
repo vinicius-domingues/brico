@@ -2,76 +2,9 @@
 #include <tokens.h>
 #include <errors.h>
 
-// --- Letras de estado (índices SEG_STATE_*) ---
-static const byte letrasEstado[5][7] = {
-  {0, 1, 1, 1, 1, 0, 1},  // 0: 'd' (Debug)      -> B, C, D, E, G
-  {1, 0, 0, 1, 1, 1, 0},  // 1: 'C' (Compilando) -> A, D, E, F
-  {0, 0, 0, 0, 1, 0, 1},  // 2: 'r' (Running)    -> E, G
-  {1, 0, 0, 1, 1, 1, 1},  // 3: 'E' (Error)      -> A, D, E, F, G
-  {0, 0, 0, 1, 1, 1, 0}   // 4: 'L' (Listening)  -> D, E, F
-};
 
-// --- Dígitos numéricos 0-9 ---
-static const byte digitos[10][7] = {
-//  A  B  C  D  E  F  G
-  { 1, 1, 1, 1, 1, 1, 0 },  // 0
-  { 0, 1, 1, 0, 0, 0, 0 },  // 1
-  { 1, 1, 0, 1, 1, 0, 1 },  // 2
-  { 1, 1, 1, 1, 0, 0, 1 },  // 3
-  { 0, 1, 1, 0, 0, 1, 1 },  // 4
-  { 1, 0, 1, 1, 0, 1, 1 },  // 5
-  { 1, 0, 1, 1, 1, 1, 1 },  // 6
-  { 1, 1, 1, 0, 0, 0, 0 },  // 7
-  { 1, 1, 1, 1, 1, 1, 1 },  // 8
-  { 1, 1, 1, 1, 0, 1, 1 },  // 9
-};
 
-// --- Mapa de pinos de segmento {A, B, C, D, E, F, G} ---
-static const byte segPins[7] = {
-  PIN_SEG_A, PIN_SEG_B, PIN_SEG_C, PIN_SEG_D,
-  PIN_SEG_E, PIN_SEG_F, PIN_SEG_G
-};
 
-// --- Mapa de pinos de seleção de dígito (DIG1 = mais à esquerda) ---
-static const byte digPins[SEG_DIGITS] = {
-  PIN_DIG_1, PIN_DIG_2, PIN_DIG_3, PIN_DIG_4
-};
-
-// ---------------------------------------------------------------------------
-// Helper interno: escreve um padrão de 7 segmentos e ativa o dígito pedido
-// ---------------------------------------------------------------------------
-static void _writeDigit(int digIndex, const byte pattern[7]) {
-    // Apaga todos os dígitos antes de trocar (evita ghosting)
-    for (int d = 0; d < SEG_DIGITS; d++) {
-        digitalWrite(digPins[d], HIGH); // HIGH = dígito desligado (cátodo comum)
-    }
-    // Escreve o padrão de segmentos
-    for (int s = 0; s < 7; s++) {
-        digitalWrite(segPins[s], pattern[s] ? HIGH : LOW);
-    }
-    // Ativa apenas o dígito desejado
-    digitalWrite(digPins[digIndex], LOW); // LOW = dígito ligado (cátodo comum)
-}
-
-// ---------------------------------------------------------------------------
-// setupSegDisplay
-// ---------------------------------------------------------------------------
-void Controller::setupSegDisplay() {
-    // Inicializa estado dos LEDs dos blocos como apagado
-    for (int i = 0; i < BLOCK_LED_MAX; i++) blockLedState[i] = BLOCK_COLOR_OFF;
-
-    // Configura pinos de segmento
-    for (int i = 0; i < 7; i++) {
-        pinMode(segPins[i], OUTPUT);
-        digitalWrite(segPins[i], LOW);
-    }
-    // Configura pinos de seleção de dígito (HIGH = desligado no cátodo comum)
-    for (int d = 0; d < SEG_DIGITS; d++) {
-        pinMode(digPins[d], OUTPUT);
-        digitalWrite(digPins[d], HIGH);
-    }
-    Serial.println(F("[DISPLAY] Pinos do 7 segmentos configurados."));
-}
 
 
 Controller::Controller() {
@@ -79,6 +12,7 @@ Controller::Controller() {
     pinMode(PIN_SET, OUTPUT);
     pinMode(PIN_CLOCK, OUTPUT);
     pinMode(PIN_BUTTON, INPUT_PULLUP);
+    pinMode(PIN_DATA_IN, INPUT_PULLDOWN); // Pino de leitura do protocolo bit-bang
     
     digitalWrite(PIN_SET, LOW);
     digitalWrite(PIN_CLOCK, LOW);
@@ -221,137 +155,190 @@ void Controller::writeEEPROM(int address, byte data) {
     Wire.endTransmission();
 }
 
+// ---------------------------------------------------------------------------
+// _waitIdleHigh — Auxiliar do Mapper()
+// Aguarda o pino PIN_DATA_IN entrar em estado HIGH (idle) antes de receber.
+// Retorna false se o timeout expirar sem que a linha estabilize em HIGH.
+// ---------------------------------------------------------------------------
+bool Controller::_waitIdleHigh(uint32_t timeoutMs) {
+    const uint32_t start = millis();
+
+    while (digitalRead(PIN_DATA_IN) == LOW) {
+        if ((millis() - start) >= timeoutMs) {
+            return false;
+        }
+    }
+
+    // Confirma que a linha permaneceu em repouso HIGH.
+    delay(50);
+    return digitalRead(PIN_DATA_IN) == HIGH;
+}
+
+// ---------------------------------------------------------------------------
+// _receiveByte — Auxiliar do Mapper()
+// Decodifica um byte do protocolo bit-bang:
+//   - Aguarda start bit (HIGH→LOW)
+//   - Amostra o meio de cada bit (8 bits, LSB-first)
+//   - Verifica stop bit (deve ser HIGH)
+// ---------------------------------------------------------------------------
+bool Controller::_receiveByte(uint8_t& data, uint32_t timeoutMs) {
+    const uint32_t start = millis();
+    uint8_t received = 0;
+
+    // Aguarda o start bit em LOW.
+    while (digitalRead(PIN_DATA_IN) == HIGH) {
+        if ((millis() - start) >= timeoutMs) {
+            return false;
+        }
+    }
+
+    // Vai para o centro do start bit.
+    delayMicroseconds(BITBANG_BIT_TIME_US / 2);
+
+    if (digitalRead(PIN_DATA_IN) != LOW) {
+        return false;
+    }
+
+    // Vai para o centro do primeiro bit de dados.
+    delayMicroseconds(BITBANG_BIT_TIME_US);
+
+    // Recebe 8 bits, do menos significativo para o mais significativo.
+    for (uint8_t bit = 0; bit < 8; bit++) {
+        if (digitalRead(PIN_DATA_IN) == HIGH) {
+            received |= static_cast<uint8_t>(1U << bit);
+        }
+
+        delayMicroseconds(BITBANG_BIT_TIME_US);
+    }
+
+    // Confere o stop bit.
+    if (digitalRead(PIN_DATA_IN) != HIGH) {
+        return false;
+    }
+
+    data = received;
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// _checksum — Auxiliar do Mapper()
+// Calcula o checksum XOR do pacote: count ^ ids[0] ^ ids[1] ^ ... ^ ids[n-1]
+// ---------------------------------------------------------------------------
+uint8_t Controller::_checksum(const ProtocolPacket& packet) {
+    uint8_t value = packet.count;
+
+    for (uint8_t i = 0; i < packet.count; i++) {
+        value ^= packet.ids[i];
+    }
+
+    return value;
+}
+
+// ---------------------------------------------------------------------------
+// _receivePacket — Auxiliar do Mapper()
+// Recebe um frame completo do protocolo:
+//   1. Varre bytes até encontrar o SOF (0xA5)
+//   2. Lê o count (quantidade de blocos)
+//   3. Lê cada id[] do pacote
+//   4. Lê e valida o checksum XOR
+// ---------------------------------------------------------------------------
+bool Controller::_receivePacket(ProtocolPacket& packet) {
+    const uint32_t frameStart = millis();
+    uint8_t value = 0;
+
+    // Procura o byte inicial 0xA5.
+    do {
+        const uint32_t elapsed = millis() - frameStart;
+
+        if (elapsed >= BITBANG_FRAME_TIMEOUT_MS) {
+            return false;
+        }
+
+        if (!_receiveByte(value, BITBANG_FRAME_TIMEOUT_MS - elapsed)) {
+            return false;
+        }
+    } while (value != BITBANG_SOF);
+
+    if (!_receiveByte(packet.count, BITBANG_BYTE_TIMEOUT_MS)) {
+        return false;
+    }
+
+    if ((packet.count == 0) || (packet.count > BITBANG_MAX_IDS)) {
+        return false;
+    }
+
+    for (uint8_t i = 0; i < packet.count; i++) {
+        if (!_receiveByte(packet.ids[i], BITBANG_BYTE_TIMEOUT_MS)) {
+            return false;
+        }
+    }
+
+    if (!_receiveByte(value, BITBANG_BYTE_TIMEOUT_MS)) {
+        return false;
+    }
+
+    return value == _checksum(packet);
+}
+
+// ---------------------------------------------------------------------------
+// Mapper
+// Recebe a sequência de blocos via protocolo bit-bang no pino PIN_DATA_IN.
+// Popula sequence[] com os ids recebidos e atualiza blocks_used.
+// A transmissão para o carrinho é feita separadamente via STATE_UART (main.cpp).
+// ---------------------------------------------------------------------------
 void Controller::Mapper(int sequence[], int& blocks_used) {
-    Serial.println(F("\n[MAPPER] Iniciando leitura do barramento (Shift Register)"));
-    
+    Serial.println(F("\n[MAPPER] Iniciando recepcao via protocolo bit-bang..."));
+
     blocks_used = 0;
-    got_error = false;
-    is_loop = false;
+    got_error   = false;
+    is_loop     = false;
 
-    int qtd_conditions = 0;
-    int qtd_functions = 0;
+    // 1. Aguarda a linha estabilizar em HIGH antes de receber
+    Serial.println(F("[MAPPER] Aguardando linha em idle HIGH..."));
+    if (!_waitIdleHigh(BITBANG_LINE_TIMEOUT_MS)) {
+        Serial.println(F("[MAPPER] ERRO: timeout aguardando idle HIGH na linha de dados."));
+        got_error = true;
+        return;
+    }
 
-    // Pilha para registrar a profundidade física (quantidade de clocks) das bifurcações
-    int branch_stack[100]; 
-    int stack_pointer = 0;
-    int physical_clocks = 0; // Conta os shifts mecânicos executados
+    // 2. Recebe o pacote completo (SOF + count + ids[] + checksum)
+    ProtocolPacket packet{};
+    if (!_receivePacket(packet)) {
+        Serial.println(F("[MAPPER] ERRO: pacote ausente ou invalido."));
+        got_error = true;
+        return;
+    }
 
-    // 1 - Injeta o _START no começo (posição 0) da fita na RAM
-    sequence[blocks_used] = _START;
-    blocks_used++;
+    // 3. Popula sequence[] com os ids recebidos (uint8_t → int).
+    //    Comportamento idêntico ao Mapper legado:
+    //      - Sempre injeta _START obrigatório no início.
+    //      - Se o último id do pacote for _END (255) → a fita termina com _END
+    //        (programa com fim definido, sem loop).
+    //      - Se o último id NÃO for _END → injeta _START no final
+    //        (programa em loop, igual ao "fechador da fita virtual" do Mapper antigo).
+    sequence[0] = _START;
     Serial.println(F("[MAPPER] [INJECAO] _START (1) adicionado obrigatoriamente no inicio."));
 
-    // Prepara o hardware (Limpa o Shift Register e seta o primeiro bloco)
-    Prepare();
-
-    // Loop de varredura (controlado pelo tamanho máximo da RAM)
-    while (blocks_used < 100) {  // Overflow → ERR_HW_SHIFT_OVERFLOW (503)
-        
-        // Dá o clock para o Shift Register avançar o estado ativo para a próxima peça
-        physical_clocks++; // Registra que o bastão andou um passo físico
-
-        // Faz a leitura do pino de dados. 
-        // Como é um Shift Register, lemos apenas a posição 1 da EEPROM do bloco ativo.
-        byte token_lido = readEEPROM(1); 
-
-        Serial.print(F("[MAPPER] Lido do hardware ativo: "));
-        Serial.println(token_lido);
-
-        // 2 - Avalia se é o fim de um braço de roteamento ou fim geral (255)
-        if (token_lido == 255 || token_lido == _END) {
-            Serial.println(F("Li um final"));
-
-            if (qtd_functions > 0) {
-                Serial.println(F("[MAPPER] [SUBSTITUICAO] 255 trocado por _ENDFUNCTION (6)."));
-                sequence[blocks_used] = _ENDFUNCTION;
-                blocks_used++;
-                qtd_functions--;
-                
-                // Mergulho de Resgate (Fast-Forward no Shift Register)
-                Serial.println(F("[MAPPER] [RESET FISICO] Acionando Prepare() (Mergulho de Funcao)."));
-                Prepare(); 
-                
-                // Resgata de qual clock (profundidade) o desvio da função ocorreu
-                stack_pointer--;
-                int target_clocks = branch_stack[stack_pointer];
-                
-                Serial.print(F("[MAPPER] [FAST-FORWARD] Shiftando cegamente "));
-                Serial.print(target_clocks);
-                Serial.println(F(" vezes para alcançar a Funcao e rotear para BAIXO..."));
-                
-                for (int j = 1; j < target_clocks; j++) {
-                    Clock();
-                }
-                // Sincroniza o ponteiro de passos físicos com a nova realidade da placa
-                physical_clocks = target_clocks; 
-
-            } else if (qtd_conditions > 0) {
-                Serial.println(F("[MAPPER] [SUBSTITUICAO] 255 trocado por _ENDCONDITION (4)."));
-                sequence[blocks_used] = _ENDCONDITION;
-                blocks_used++;
-                qtd_conditions--;
-                
-                // Mergulho de Resgate (Fast-Forward no Shift Register)
-                Serial.println(F("[MAPPER] [RESET FISICO] Acionando Prepare() (Mergulho de Condicao)."));
-                Prepare(); 
-                
-                // Resgata de qual clock (profundidade) o desvio da condição ocorreu
-                stack_pointer--;
-                int target_clocks = branch_stack[stack_pointer];
-                
-                Serial.print(F("[MAPPER] [FAST-FORWARD] Shiftando cegamente "));
-                Serial.print(target_clocks);
-                Serial.println(F(" vezes para alcançar a Condicao e rotear para BAIXO..."));
-                
-                for (int j = 1; j < target_clocks; j++) {
-
-                    Clock();
-                }
-                // Sincroniza o ponteiro de passos físicos com a nova realidade da placa
-                physical_clocks = target_clocks; 
-
-            } else {
-                // Não está dentro de nada e leu 255
-                Serial.println(F("[MAPPER] 255 lido com saldos estruturais zerados. FIM REAL DA TRILHA."));
-                
-                // Injeção de Borda: O código final exige _START como fechador absoluto da fita virtual
-                sequence[blocks_used] = _START;
-                //blocks_used = blocks_limit;
-                blocks_used++;
-                
-                Serial.println(F("[MAPPER] [INJECAO] _START (1) adicionado como FIM absoluto da fita na RAM."));
-                break; // Sai do laço while, mapeamento concluído
-            }
-
-        } else {
-            // Se não for 255, rastreamos o tipo estrutural usando tokens.h e adicionamos na RAM
-            if (isCondition(token_lido)) {
-                qtd_conditions++;
-                // Grava a profundidade do Shift Register na pilha ANTES da peça rotear fisicamente para a direita
-                branch_stack[stack_pointer] = physical_clocks;
-                stack_pointer++;
-                Serial.println(F("[MAPPER] [ESTADO] Entrou em uma CONDICAO. Endereco eletrico salvo na pilha."));
-                
-            } else if (isFunction(token_lido)) {
-                qtd_functions++;
-                // Grava a profundidade do Shift Register na pilha ANTES da peça rotear fisicamente para a direita
-                branch_stack[stack_pointer] = physical_clocks;
-                stack_pointer++;
-                Serial.println(F("[MAPPER] [ESTADO] Entrou em uma FUNCAO. Endereco eletrico salvo na pilha."));
-            }
-
-            // Grava o token lido na fita virtual da RAM do Arduino
-            sequence[blocks_used] = token_lido;
-            blocks_used++;
-        }
-        
-        Clock(); // O prepare ja da um clock inicial, entao só precisa ler aqui
-
-        delay(1000); 
-    
+    for (uint8_t i = 0; i < packet.count; i++) {
+        sequence[i + 1] = static_cast<int>(packet.ids[i]);
     }
-    
-// Debug final de como ficou a fita salva na RAM do Arduino, pronta para o Evaluator
+
+    bool ultimo_e_end = (packet.ids[packet.count - 1] == _END);
+
+    if (ultimo_e_end) {
+        // Transmissor sinalizou fim — mantém _END como fechador da fita
+        blocks_used = static_cast<int>(packet.count) + 1; // +1 pelo _START inicial
+        Serial.println(F("[MAPPER] Ultimo token e _END (255). Fita com FIM DEFINIDO (sem loop)."));
+    } else {
+        // Sem _END → injeta _START no final como fechador (programa em loop)
+        sequence[packet.count + 1] = _START;
+        blocks_used = static_cast<int>(packet.count) + 2; // +2 pelos dois _START
+        Serial.println(F("[MAPPER] [INJECAO] _START (1) adicionado como FIM da fita (programa em LOOP)."));
+    }
+
+
+
+    // 4. Debug: imprime a fita de tokens recebida na RAM
     Serial.println(F("=================================================="));
     Serial.print(F("[MAPPER] FITA FINAL DE TOKENS NA RAM: "));
     for (int i = 0; i < blocks_used; i++) {
@@ -359,100 +346,38 @@ void Controller::Mapper(int sequence[], int& blocks_used) {
         if (i < blocks_used - 1) Serial.print(F(" - "));
     }
     Serial.println();
-
-    // ==========================================
-    // TRANSMISSÃO I2C (Pacotes de 1 Byte)
-    // ==========================================
-    
-    // 1. Avisa o Slave qual é o tamanho total da fita
-    Wire.beginTransmission(8); 
-    Wire.write(blocks_used); 
-    
-    
-    delay(20); // Dá um respiro pro Slave zerar os contadores dele
-
-    // 2. Envia a fita verdadeira, uma peça por vez!
-    for (int i = 0; i < blocks_used; i++) {
-        
-        Wire.write(sequence[i]); // Cast para byte garante a conversão limpa
-        
-        
-        delay(100); // Intervalo REAL no barramento I2C
-    }
-    if (Wire.endTransmission() != 0) {
-        Serial.println(F("[I2C] Erro 500: Falha na transmissao I2C (ERR_HW_I2C_FALHA)"));
-    } else {
-        Serial.println(F("[I2C] Transmissao para o Slave 8 concluida com sucesso!"));
-    }
     Serial.println(F("=================================================="));
 }
 
+
+
 void Controller::ShowState(int stateIndex) {
-    // Guarda de índice inválido
-    if (stateIndex < 0 || stateIndex > 4) {
-        Serial.print(F("[DISPLAY] Erro: indice invalido para ShowState: "));
-        Serial.println(stateIndex);
-        return;
+    Serial.print(F("[STATE] "));
+    switch (stateIndex) {
+        case SEG_STATE_DEBUG:     Serial.println(F("DEBUG"));      break;
+        case SEG_STATE_COMPILE:   Serial.println(F("COMPILANDO")); break;
+        case SEG_STATE_RUNNING:   Serial.println(F("RUNNING"));    break;
+        case SEG_STATE_ERROR:     Serial.println(F("ERROR"));      break;
+        case SEG_STATE_LISTENING: Serial.println(F("LISTENING"));  break;
+        default:                  Serial.println(stateIndex);      break;
     }
-
-    // Exibe o padrão no dígito 1 (único dígito para estados simples)
-    _writeDigit(0, letrasEstado[stateIndex]);
-
-    Serial.print(F("[DISPLAY] ShowState -> indice "));
-    Serial.println(stateIndex);
 }
 
 void Controller::ShowError(int errorCode) {
-    Serial.print(F("[DISPLAY] ShowError -> codigo "));
+    Serial.print(F("[ERROR] Codigo: "));
     Serial.println(errorCode);
+    Serial.println(F("[ERROR] Aperte o botao para retomar."));
 
-    // Decompoe o codigo em 3 digitos (maximo 999 para um codigo de 3 digitos)
-    int cod = (errorCode >= 0 && errorCode <= 999) ? errorCode : 999;
-    int centenas = cod / 100;
-    int dezenas  = (cod % 100) / 10;
-    int unidades = cod % 10;
+    // Garante que o botao nao esteja ja pressionado
+    while (digitalRead(PIN_BUTTON) == LOW) { delay(10); }
 
-    // Monta o array de padroes para os 4 digitos: [E, centenas, dezenas, unidades]
-    const byte* padroes[SEG_DIGITS] = {
-        letrasEstado[SEG_STATE_ERROR], // Digito 1: 'E'
-        digitos[centenas],             // Digito 2: centenas
-        digitos[dezenas],              // Digito 3: dezenas
-        digitos[unidades]              // Digito 4: unidades
-    };
-
-    Serial.println(F("[DISPLAY] Aperte o botao para retomar"));
-
-    // Garante que o botao nao esteja ja pressionado antes de comecar a esperar
-    while (digitalRead(PIN_BUTTON) == LOW) {
-        // Continua multiplexando enquanto o botao permanece pressionado
-        for (int d = 0; d < SEG_DIGITS; d++) {
-            _writeDigit(d, padroes[d]);
-            delay(SEG_MUX_DELAY_MS);
-        }
-    }
-
-    // Espera o botao ser pressionado (LOW) — multiplexando o display enquanto isso
-    while (digitalRead(PIN_BUTTON) == HIGH) {
-        for (int d = 0; d < SEG_DIGITS; d++) {
-            _writeDigit(d, padroes[d]);
-            delay(SEG_MUX_DELAY_MS);
-        }
-    }
+    // Espera o botao ser pressionado
+    while (digitalRead(PIN_BUTTON) == HIGH) { delay(10); }
 
     // Espera o botao ser solto (debounce)
-    while (digitalRead(PIN_BUTTON) == LOW) {
-        for (int d = 0; d < SEG_DIGITS; d++) {
-            _writeDigit(d, padroes[d]);
-            delay(SEG_MUX_DELAY_MS);
-        }
-    }
+    while (digitalRead(PIN_BUTTON) == LOW)  { delay(10); }
 
-    // Apaga todos os digitos ao sair
-    for (int d = 0; d < SEG_DIGITS; d++) {
-        digitalWrite(digPins[d], HIGH);
-    }
-
-    Serial.println(F("[DISPLAY] Botao pressionado. Retornando ao Debug."));
+    Serial.println(F("[ERROR] Botao pressionado. Retomando."));
 }
 
 void Controller::ResetBlockLeds() {

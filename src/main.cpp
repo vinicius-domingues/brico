@@ -2,13 +2,9 @@
 #include "syntax.h"
 #include "tokens.h"
 #include "controller.h"
-#include "car_actuator.h"
-#include "evaluator.h"
 
 Controller* arduino;
 Syntax*     analisador;
-Car*        carrinho;
-Evaluator*  executor;
 
 // [BLOCK_LED DESATIVADO] Ponte global: repassa o callback do Syntax para IlluminateBlock
 // static void _blockLedBridge(int blockIndex, byte color) {
@@ -20,57 +16,50 @@ int sequence[blocks_limit];          // Array de sequencia
 int blocks_read = 0;                 // Posições do array que foram usadas
 unsigned long brand_new_instant = 0;
 unsigned long seconds_running = 0;
-enum SystemState {STATE_DEBUG, STATE_COMPILE, STATE_RUNNING};
-SystemState currentState = STATE_DEBUG; 
+enum SystemState {STATE_DEBUG, STATE_LISTENER, STATE_ERROR, STATE_COMPILE, STATE_UART};
+SystemState currentState = STATE_LISTENER; 
 
 void setup() {
-    Serial.begin(9600);
+    Serial.begin(115200);
 
-    Serial.println(" ");
+    Serial.println("SETUP COMEÇO");
         arduino = new Controller();
-        carrinho = new Car();
         analisador = new Syntax();
-        arduino->setupSegDisplay();
-        arduino->ShowState(SEG_STATE_DEBUG);
-    Serial.println(" ");
+        //arduino->setupSegDisplay();
+        //arduino->ShowState(SEG_STATE_DEBUG);
+    Serial.println("SETUP FIM");
 }
 
 void loop() {
     switch (currentState) {
-        case STATE_DEBUG:
+        case STATE_DEBUG: {
             arduino->ShowState(SEG_STATE_DEBUG);
             arduino->DebugMenu();
+            currentState = STATE_LISTENER;  
+        }
+        
+        case STATE_LISTENER: {
+            // Aguarda botão para ler novamente
+            arduino->Listener();
             currentState = STATE_COMPILE;
+        }
 
         case STATE_COMPILE: {
             arduino->ShowState(SEG_STATE_COMPILE);
             // arduino->ResetBlockLeds(); // [BLOCK_LED DESATIVADO] Apaga todos os LEDs antes de comecar a varredura
             int error_stage = 0; 
-
-            // arduino->Listener();
             
-            // arduino->Mapper(sequence, blocks_read); // Tem que dar erro se houver mais que 100 blocos.
-            
-            // Testes apenas
-            Serial.println(F("[MAIN] Rodando em modo de TESTE"));
-            // int teste[] = {_START, _WHILE, _PROXIMITY, _EQUAL, _FALSE, _AND, _SMALLER, _FIVE, _ENDCONDITION, _GREEN_LED, _ENDBLOCK, _RED_LED, _END};
-            // int teste[] = {_START, _WHILE, _SEGUNDOS, _SMALLER, _FIFTY, _ENDCONDITION, _WHILE, _SEGUNDOS, _SMALLER, _FIVE, _ENDCONDITION, _RED_LED, _ENDBLOCK, _GREEN_LED, _ENDBLOCK, _BLUE_LED, _START};
-            // int teste[] = {_START, _WHILE, _SEGUNDOS, _SMALLER, _FIVE, _ENDCONDITION, _RED_LED, _ENDBLOCK, _GREEN_LED, _END};
-            // int teste[] = {_START, _RED_LED, _DELAY, _ONE, _ENDFUNCTION, _GREEN_LED, _DELAY, _ONE, _ENDFUNCTION, _BLUE_LED, _DELAY, _ONE, _ENDFUNCTION,_START}; // , _GREEN_LED, _DELAY, _ONE, _ENDFUNCTION, _GREEN_LED, _DELAY, _ONE, _ENDFUNCTION, _START};
+            arduino->Mapper(sequence, blocks_read); // Tem que dar erro se houver mais que 100 blocos.
 
-            // Lógica Pedro
-            // int teste[] = {_START, _GREEN_LED, _WHILE, _FIVE, _TRUE, _ENDCONDITION, _RED_LED, _ENDBLOCK};
-
-            // l2
-            // int teste[] = {_START, _GREEN_LED, _WHILE, _SEGUNDOS, _EQUAL, _FIVE, _ENDCONDITION, _RED_LED, _ENDBLOCK};
-
-            // L3
-            // int teste[] = {_START, _WHILE, _SEGUNDOS, _EQUAL, _FIVE, _ENDCONDITION,  _GREEN_LED, _RED_LED, _ENDBLOCK};
-
-            int teste[] = {_START, _RED_LED, _DELAY, _FIVE, _ENDFUNCTION, _GREEN_LED, _DELAY, _FIVE, _ENDFUNCTION, _BLUE_LED, _DELAY, _FIVE, _ENDFUNCTION, _START};
-            blocks_read = sizeof(teste) / sizeof(teste[0]);
-            memcpy(sequence, teste, sizeof(teste));
-
+            // --- Print da sequência lida pelo Mapper ---
+            Serial.print(F("[MAIN] Sequencia lida ("));
+            Serial.print(blocks_read);
+            Serial.print(F(" blocos): ["));
+            for (int i = 0; i < blocks_read; i++) {
+                if (i > 0) Serial.print(F(", "));
+                Serial.print(sequence[i]);
+            }
+            Serial.println(F("]"));
 
             // analisador->onBlockLed = _blockLedBridge; // [BLOCK_LED DESATIVADO]
 
@@ -84,41 +73,68 @@ void loop() {
 
             // Controle de transição com base no resultado
             if (error_stage == 0) {
-                Serial.println(F("[MAIN] Sem erros. Passando codigo validado via UART."));
+                // Transmite a sequência para o carrinho via UART
+                currentState = STATE_UART; 
 
-                // Passaria via UART. Não terá aqui o Evaluator nem o Executor
-                    // Passamos: Sequencia uma a uma e se é loop ou não (o tamanho da sequencia n precisa pois isso pode ser feito no EvaL)
-
-                // Mata objeto executor anterior
-                if (executor != nullptr) { delete executor; }
-
-                // Instância
-                executor = new Evaluator(sequence, blocks_read, arduino->is_loop, carrinho);
-                
-                currentState = STATE_RUNNING; 
                 arduino->ShowState(SEG_STATE_RUNNING);
-                Serial.println(F("[MAIN] Avaliacao comecando."));
+                Serial.println(F("[MAIN] Compilacao concluida. Pronto para transmitir."));
                 
             } else {
                 // LEDs ja foram atualizados pelo callback dentro do Syntax
                 // Exibe 'E' + codigo no display e trava ate o botao ser pressionado
                 arduino->ShowError(analisador->result);
                 if (analisador != nullptr) { delete analisador; }
-                if (executor != nullptr)  { delete executor; }
-                currentState = STATE_DEBUG; 
+                currentState = STATE_ERROR; 
             }
             break;
         }
 
-        case STATE_RUNNING: {
-            if (executor->run) {
-                executor->Eval();
-            } else {
-                Serial.println(F("\n[MAIN] Fim do script alcançado! Execução do carrinho concluída.    //    Retornando ao console de depuração..."));
-                delete analisador; 
-                currentState = STATE_DEBUG; 
+        case STATE_ERROR: {
+            currentState = STATE_COMPILE;
+            break;
+        }
+
+        case STATE_UART: {
+            // Comunicar via UART
+            Serial.println(F("\n[UART] Iniciando transmissao dos blocos para o microcontrolador receptor..."));
+
+            // 1. Envia cabeçalho com a quantidade de blocos
+            Serial.print(F("START:"));
+            Serial.println(blocks_read);
+
+            // 2. Envia a sequência de blocos compilados
+            for (int i = 0; i < blocks_read; i++) {
+                Serial.print(F("BLOCK["));
+                Serial.print(i);
+                Serial.print(F("]:"));
+                Serial.println(sequence[i]);
+                delay(10); // Pequeno atraso para estabilidade do buffer de recepção
             }
 
+            // 3. Envia mensagem de finalização de transmissão
+            Serial.println(F("END"));
+
+            // 4. (Opcional) Aguarda confirmação (ACK) do outro microcontrolador
+            unsigned long timeout = millis() + 2000;
+            bool ackReceived = false;
+            while (millis() < timeout) {
+                if (Serial.available() > 0) {
+                    String response = Serial.readStringUntil('\n');
+                    response.trim();
+                    if (response == "ACK" || response == "OK") {
+                        ackReceived = true;
+                        Serial.println(F("[UART] Confirmacao recebida com sucesso!"));
+                        break;
+                    }
+                }
+            }
+
+            if (!ackReceived) {
+                Serial.println(F("[UART] Timeout: Nenhum ACK recebido do receptor."));
+            }
+
+            // Retorna ao estado inicial/espera após transmissão
+            currentState = STATE_LISTENER;
             break;
         }
     }

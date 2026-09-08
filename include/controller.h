@@ -6,6 +6,12 @@
 #include <tokens.h>
 
 
+// Estrutura de pacote do protocolo bit-bang — usada pelo Mapper() e seus auxiliares
+struct ProtocolPacket {
+    uint8_t count;
+    uint8_t ids[BITBANG_MAX_IDS];
+};
+
 class Controller{
   public:
     //static const int blocks_limit = 50;
@@ -23,8 +29,7 @@ class Controller{
     void Prepare();   // Prepara o shift register
     void transmitI2C(byte slaveAddress); // Comunica com o atuador
     void Stop();      // Só para o código naquele trecho para sempre
-    void setupSegDisplay();         // Configura os pinos do display 7 segmentos como OUTPUT
-    void ShowState(int stateIndex); // Exibe uma letra no display 7 segmentos
+    void ShowState(int stateIndex); // Exibe estado via Serial
     void ShowError(int errorCode);  // Exibe 'E' + código (3 dígitos) e aguarda botão
     void IlluminateBlock(int blockIndex, byte color); // Atualiza cor de um bloco e envia ao hardware
     void ResetBlockLeds();           // Apaga todos os LEDs dos blocos
@@ -33,6 +38,16 @@ class Controller{
     byte readEEPROM(int address);
     void FlushBlockLeds();           // Envia blockLedState[] ao hardware via shift register
     byte blockLedState[BLOCK_LED_MAX]; // Estado atual de cor de cada bloco
+
+    // --- Auxiliares do Mapper() — protocolo bit-bang ---
+    // Aguarda o pino PIN_DATA_IN entrar em estado HIGH (idle) antes de receber
+    bool _waitIdleHigh(uint32_t timeoutMs);
+    // Decodifica um byte via protocolo bit-bang (start bit + 8 bits LSB-first + stop bit)
+    bool _receiveByte(uint8_t& data, uint32_t timeoutMs);
+    // Calcula o checksum XOR do pacote (count ^ ids[0] ^ ... ^ ids[n-1])
+    uint8_t _checksum(const ProtocolPacket& packet);
+    // Recebe um frame completo: aguarda SOF, lê count, ids[] e valida checksum
+    bool _receivePacket(ProtocolPacket& packet);
 };
 
 #endif
