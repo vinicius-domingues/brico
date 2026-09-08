@@ -1,127 +1,150 @@
 #include <Arduino.h>
-#include "syntax.h"
 #include "tokens.h"
-#include "controller.h"
 #include "car_actuator.h"
 #include "evaluator.h"
 
-Controller* arduino;
-Syntax*     analisador;
-Car*        carrinho;
-Evaluator*  executor;
+// GPIO 6 a 11 sao da Flash SPI interna no ESP32. GPIO 33 e livre e seguro conforme o MD.
+#define PIN_DOCK_SENSOR 33  
+#define PIN_CAR_BUTTON  4   // BOTAO — GPIO4 conforme configuracao_carrinho_brico.md
 
-// [BLOCK_LED DESATIVADO] Ponte global: repassa o callback do Syntax para IlluminateBlock
-// static void _blockLedBridge(int blockIndex, byte color) {
-//     if (arduino != nullptr) arduino->IlluminateBlock(blockIndex, color);
-// }
+Car*       carrinho = nullptr;
+Evaluator* executor = nullptr;
 
-static const int blocks_limit = 100; // Limite de blocos no sistema
-int sequence[blocks_limit];          // Array de sequencia
-int blocks_read = 0;                 // Posições do array que foram usadas
-unsigned long brand_new_instant = 0;
-unsigned long seconds_running = 0;
-enum SystemState {STATE_DEBUG, STATE_COMPILE, STATE_RUNNING};
-SystemState currentState = STATE_DEBUG; 
+static const int MAX_BLOCKS = 100;
+int sequence[MAX_BLOCKS];
+int blocks_read = 0;
+bool is_loop_mode = false;
+
+enum CarState {
+    STATE_CHECK_CAIXA, // Verifica se o carrinho esta na caixa
+    STATE_WAIT_BOX,     // Aguarda receber os dados via UART da caixa
+    STATE_STORAGE,     // Armazena e confirma a sequencia recebida
+    STATE_LISTENER,    // Fora da caixa: aguarda clique no botao do carrinho
+    STATE_EXECUTE      // Executa o script interpretado pelo Evaluator
+};
+
+CarState currentState = STATE_CHECK_CAIXA;
+
+bool isNaCaixa() {
+    return digitalRead(PIN_DOCK_SENSOR) == LOW; 
+}
 
 void setup() {
-    Serial.begin(9600);
+    Serial.begin(115200);
+    delay(1000); // Aguarda serial estabilizar
+    Serial.println(F("\n=========================================="));
+    Serial.println(F("[SETUP] ESP32 ACORDOU COM SUCESSO!"));
+    Serial.println(F("=========================================="));
 
-    Serial.println(" ");
-        arduino = new Controller();
-        carrinho = new Car();
-        analisador = new Syntax();
-        arduino->setupSegDisplay();
-        arduino->ShowState(SEG_STATE_DEBUG);
-    Serial.println(" ");
+    Serial.println(F("[SETUP] Configurando pinos basicos (DOCK e BOTAO)..."));
+    pinMode(PIN_DOCK_SENSOR, INPUT_PULLUP);
+    pinMode(PIN_CAR_BUTTON, INPUT_PULLDOWN);
+
+    Serial.println(F("[SETUP] Instanciando Car..."));
+    carrinho = new Car();
+    Serial.println(F("[SETUP] Setup finalizado com sucesso!"));
 }
 
 void loop() {
     switch (currentState) {
-        case STATE_DEBUG:
-            arduino->ShowState(SEG_STATE_DEBUG);
-            arduino->DebugMenu();
-            currentState = STATE_COMPILE;
 
-        case STATE_COMPILE: {
-            arduino->ShowState(SEG_STATE_COMPILE);
-            // arduino->ResetBlockLeds(); // [BLOCK_LED DESATIVADO] Apaga todos os LEDs antes de comecar a varredura
-            int error_stage = 0; 
-
-            // arduino->Listener();
-            
-            // arduino->Mapper(sequence, blocks_read); // Tem que dar erro se houver mais que 100 blocos.
-            
-            // Testes apenas
-            Serial.println(F("[MAIN] Rodando em modo de TESTE"));
-            // int teste[] = {_START, _WHILE, _PROXIMITY, _EQUAL, _FALSE, _AND, _SMALLER, _FIVE, _ENDCONDITION, _GREEN_LED, _ENDBLOCK, _RED_LED, _END};
-            // int teste[] = {_START, _WHILE, _SEGUNDOS, _SMALLER, _FIFTY, _ENDCONDITION, _WHILE, _SEGUNDOS, _SMALLER, _FIVE, _ENDCONDITION, _RED_LED, _ENDBLOCK, _GREEN_LED, _ENDBLOCK, _BLUE_LED, _START};
-            // int teste[] = {_START, _WHILE, _SEGUNDOS, _SMALLER, _FIVE, _ENDCONDITION, _RED_LED, _ENDBLOCK, _GREEN_LED, _END};
-            // int teste[] = {_START, _RED_LED, _DELAY, _ONE, _ENDFUNCTION, _GREEN_LED, _DELAY, _ONE, _ENDFUNCTION, _BLUE_LED, _DELAY, _ONE, _ENDFUNCTION,_START}; // , _GREEN_LED, _DELAY, _ONE, _ENDFUNCTION, _GREEN_LED, _DELAY, _ONE, _ENDFUNCTION, _START};
-
-            // Lógica Pedro
-            // int teste[] = {_START, _GREEN_LED, _WHILE, _FIVE, _TRUE, _ENDCONDITION, _RED_LED, _ENDBLOCK};
-
-            // l2
-            // int teste[] = {_START, _GREEN_LED, _WHILE, _SEGUNDOS, _EQUAL, _FIVE, _ENDCONDITION, _RED_LED, _ENDBLOCK};
-
-            // L3
-            // int teste[] = {_START, _WHILE, _SEGUNDOS, _EQUAL, _FIVE, _ENDCONDITION,  _GREEN_LED, _RED_LED, _ENDBLOCK};
-
-            int teste[] = {_START, _RED_LED, _DELAY, _FIVE, _ENDFUNCTION, _GREEN_LED, _DELAY, _FIVE, _ENDFUNCTION, _BLUE_LED, _DELAY, _FIVE, _ENDFUNCTION, _START};
-            blocks_read = sizeof(teste) / sizeof(teste[0]);
-            memcpy(sequence, teste, sizeof(teste));
-
-
-            // analisador->onBlockLed = _blockLedBridge; // [BLOCK_LED DESATIVADO]
-
-            if (analisador->Parser(sequence, blocks_read)) {
-                error_stage++;
-            } else if (analisador->LookAhead(sequence, blocks_read)) {
-                error_stage++;
-            } else if (analisador->Semantic(sequence, blocks_read)) {
-                error_stage++;
-            }       
-
-            // Controle de transição com base no resultado
-            if (error_stage == 0) {
-                Serial.println(F("[MAIN] Sem erros. Passando codigo validado via UART."));
-
-                // Passaria via UART. Não terá aqui o Evaluator nem o Executor
-                    // Passamos: Sequencia uma a uma e se é loop ou não (o tamanho da sequencia n precisa pois isso pode ser feito no EvaL)
-
-                // Mata objeto executor anterior
-                if (executor != nullptr) { delete executor; }
-
-                // Instância
-                executor = new Evaluator(sequence, blocks_read, arduino->is_loop, carrinho);
-                
-                currentState = STATE_RUNNING; 
-                arduino->ShowState(SEG_STATE_RUNNING);
-                Serial.println(F("[MAIN] Avaliacao comecando."));
-                
+        case STATE_CHECK_CAIXA: {
+            Serial.println(F("Estou vendo se estou na caixa ou nao"));
+            if (isNaCaixa()) {
+                Serial.println(F("Estou na caixa esperando UART"));
+                currentState = STATE_WAIT_BOX;
             } else {
-                // LEDs ja foram atualizados pelo callback dentro do Syntax
-                // Exibe 'E' + codigo no display e trava ate o botao ser pressionado
-                arduino->ShowError(analisador->result);
-                if (analisador != nullptr) { delete analisador; }
-                if (executor != nullptr)  { delete executor; }
-                currentState = STATE_DEBUG; 
+                Serial.println(F("Estou fora da caixa, aguardando meu botao pra comecar"));
+                currentState = STATE_LISTENER;
             }
             break;
         }
 
-        case STATE_RUNNING: {
-            if (executor->run) {
-                executor->Eval();
-            } else {
-                Serial.println(F("\n[MAIN] Fim do script alcançado! Execução do carrinho concluída.    //    Retornando ao console de depuração..."));
-                delete analisador; 
-                currentState = STATE_DEBUG; 
+        case STATE_WAIT_BOX: {
+            Serial.println(F("Estou esperando vir codigos da caixa"));
+            if (Serial.available() > 0) {
+                String line = Serial.readStringUntil('\n');
+                line.trim();
+
+                if (line.startsWith("START:")) {
+                    blocks_read = line.substring(6).toInt();
+                    int idx = 0;
+                    unsigned long timeout = millis() + 3000;
+
+                    while (millis() < timeout && idx < blocks_read) {
+                        if (Serial.available() > 0) {
+                            String blockLine = Serial.readStringUntil('\n');
+                            blockLine.trim();
+
+                            if (blockLine.startsWith("BLOCK[")) {
+                                int colonIdx = blockLine.indexOf(':');
+                                if (colonIdx != -1) {
+                                    sequence[idx++] = blockLine.substring(colonIdx + 1).toInt();
+                                }
+                            } else if (blockLine == "END") {
+                                break;
+                            }
+                        }
+                    }
+                    currentState = STATE_STORAGE;
+                }
+            }
+            break;
+        }
+
+        case STATE_STORAGE: {
+            Serial.println(F("Blocos armazenados na memoria"));
+            Serial.println(F("ACK"));
+            carrinho->GreenLed();
+            currentState = STATE_CHECK_CAIXA;
+            break;
+        }
+
+        case STATE_LISTENER: {
+            // Se foi recolocado na caixa, volta a checar
+            if (isNaCaixa()) {
+                currentState = STATE_CHECK_CAIXA;
+                break;
             }
 
+            if (digitalRead(PIN_CAR_BUTTON) == HIGH) {
+                delay(50); // Debounce simples
+                if (digitalRead(PIN_CAR_BUTTON) == HIGH) {
+                    if (blocks_read == 0) {
+                        Serial.println(F("[LISTENER] Botao pressionado, mas NENHUM bloco foi carregado pela caixa ainda!"));
+                        delay(500);
+                        break;
+                    }
+
+                    Serial.print(F("[LISTENER] Iniciando execucao com "));
+                    Serial.print(blocks_read);
+                    Serial.println(F(" blocos..."));
+
+                    if (executor != nullptr) { delete executor; }
+                    executor = new Evaluator(sequence, blocks_read, is_loop_mode, carrinho);
+                    currentState = STATE_EXECUTE;
+                }
+            }
+            break;
+        }
+
+        case STATE_EXECUTE: {
+            if (executor != nullptr && executor->run) {
+                executor->Eval();
+            } else {
+                Serial.println(F("Executou tudo"));
+
+                if (executor != nullptr) {
+                    delete executor;
+                    executor = nullptr;
+                }
+
+                carrinho->Brake();
+                
+                // Apos executar, volta para o LISTENER aguardando novo start
+                currentState = STATE_LISTENER;
+            }
             break;
         }
     }
-
-    Serial.println(" ");
 }
