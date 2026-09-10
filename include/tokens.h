@@ -104,13 +104,6 @@
     #define BLOCK_COLOR_YELLOW 2
     #define BLOCK_COLOR_RED    3
 
-    // Índices de estado (usados nas chamadas ShowState() em main.cpp)
-    #define SEG_STATE_DEBUG     0
-    #define SEG_STATE_COMPILE   1
-    #define SEG_STATE_RUNNING   2
-    #define SEG_STATE_ERROR     3
-    #define SEG_STATE_LISTENING 4
-
 
 // 1 - Ações e Sensores (Separados para corrigir erros semânticos)
 inline bool isVoidMethod(int t)    { return (t >= _BRAKE && t <= _BLUE_LED); } 

@@ -38,7 +38,6 @@ void loop() {
         }
 
         case STATE_COMPILE: {
-            arduino->ShowState(SEG_STATE_COMPILE);
             // arduino->ResetBlockLeds(); // [BLOCK_LED DESATIVADO] Apaga todos os LEDs antes de comecar a varredura
             int error_stage = 0; 
             
@@ -69,7 +68,6 @@ void loop() {
                 // Transmite a sequência para o carrinho via UART
                 currentState = STATE_UART; 
 
-                arduino->ShowState(SEG_STATE_RUNNING);
                 Serial.println(F("[MAIN] Compilacao concluida. Pronto para transmitir."));
                 
             } else {

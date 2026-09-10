@@ -26,7 +26,6 @@ class Controller{
     void Mapper(int sequence[], int& blocks_used);    // Mapeia todas as peças (forma a sequência, começa vazio)
     void transmitI2C(byte slaveAddress); // Comunica com o atuador
     void Stop();      // Só para o código naquele trecho para sempre
-    void ShowState(int stateIndex); // Exibe estado via Serial
     void ShowError(int errorCode);  // Exibe 'E' + código (3 dígitos) e aguarda botão
     void IlluminateBlock(int blockIndex, byte color); // Atualiza cor de um bloco e envia ao hardware
     void ResetBlockLeds();           // Apaga todos os LEDs dos blocos

@@ -263,18 +263,6 @@ void Controller::Mapper(int sequence[], int& blocks_used) {
 
 
 
-void Controller::ShowState(int stateIndex) {
-    Serial.print(F("[STATE] "));
-    switch (stateIndex) {
-        case SEG_STATE_DEBUG:     Serial.println(F("DEBUG"));      break;
-        case SEG_STATE_COMPILE:   Serial.println(F("COMPILANDO")); break;
-        case SEG_STATE_RUNNING:   Serial.println(F("RUNNING"));    break;
-        case SEG_STATE_ERROR:     Serial.println(F("ERROR"));      break;
-        case SEG_STATE_LISTENING: Serial.println(F("LISTENING"));  break;
-        default:                  Serial.println(stateIndex);      break;
-    }
-}
-
 void Controller::ShowError(int errorCode) {
     Serial.print(F("[ERROR] Codigo: "));
     Serial.println(errorCode);
