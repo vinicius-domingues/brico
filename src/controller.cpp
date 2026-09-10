@@ -9,13 +9,14 @@
 
 Controller::Controller() {
     Wire.begin(); 
-    pinMode(PIN_SET, OUTPUT);
-    pinMode(PIN_CLOCK, OUTPUT);
+    // Pinos 16 (RX2) e 17 (TX2) sao reservados para comunicacao UART Serial2
+    // pinMode(PIN_SET, OUTPUT);
+    // pinMode(PIN_CLOCK, OUTPUT);
     pinMode(PIN_BUTTON, INPUT_PULLUP);
     pinMode(PIN_DATA_IN, INPUT_PULLDOWN); // Pino de leitura do protocolo bit-bang
     
-    digitalWrite(PIN_SET, LOW);
-    digitalWrite(PIN_CLOCK, LOW);
+    // digitalWrite(PIN_SET, LOW);
+    // digitalWrite(PIN_CLOCK, LOW);
 }
 
 void Controller::Prepare() {
