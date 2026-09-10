@@ -21,16 +21,11 @@ SystemState currentState = STATE_LISTENER;
 
 void setup() {
     Serial.begin(115200);
-
-    // Inicialização da Serial2: RX2 = Pino 16, TX2 = Pino 17
     Serial2.begin(115200, SERIAL_8N1, PIN_UART_RX, PIN_UART_TX);
 
-    Serial.println(F("SETUP COMEÇO"));
-        arduino = new Controller();
-        analisador = new Syntax();
-        //arduino->setupSegDisplay();
-        //arduino->ShowState(SEG_STATE_DEBUG);
-    Serial.println(F("SETUP FIM"));
+    arduino = new Controller();
+    analisador = new Syntax();
+
 }
 
 void loop() {
