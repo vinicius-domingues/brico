@@ -2,43 +2,15 @@
 #include <tokens.h>
 #include <errors.h>
 
-
-
-
-
-
 Controller::Controller() {
     Wire.begin(); 
-    // Pinos 16 (RX2) e 17 (TX2) sao reservados para comunicacao UART Serial2
-    // pinMode(PIN_SET, OUTPUT);
-    // pinMode(PIN_CLOCK, OUTPUT);
     pinMode(PIN_BUTTON, INPUT_PULLUP);
-    pinMode(PIN_DATA_IN, INPUT_PULLDOWN); // Pino de leitura do protocolo bit-bang
-    
-    // digitalWrite(PIN_SET, LOW);
-    // digitalWrite(PIN_CLOCK, LOW);
-}
-
-void Controller::Prepare() {
-    digitalWrite(PIN_SET, HIGH);
-    delay(10); 
-    Clock();
-    digitalWrite(PIN_SET, LOW);
-    delay(10);
-    Serial.println(F("[HARDWARE] Prepare enviado."));
+    pinMode(PIN_DATA_IN, INPUT_PULLDOWN); 
 }
 
 void Controller::Stop() {
     Serial.println(F("[STOP]"));
     delay(999999);
-}
-
-void Controller::Clock() {
-    digitalWrite(PIN_CLOCK, HIGH);
-    delay(10); 
-    digitalWrite(PIN_CLOCK, LOW);
-    delay(10);
-    Serial.println(F("[HARDWARE] Pulso de CLOCK enviado."));
 }
 
 void Controller::Listener() {
@@ -76,67 +48,6 @@ byte Controller::readEEPROM(int address) {
   }
 
   return 0xFF; 
-}
-
-void Controller::DebugMenu() {
-    bool in_debug = true;
-    bool estadoSet = false;
-
-    Serial.println(F("\n|===================================="));
-    Serial.println(F("|  CONSOLE DE DEBUG - FUZZY BLOCKS  |"));
-    Serial.println(F("|===================================="));
-    Serial.println(F("| 'c' -> Gerar pulso de Clock"));
-    Serial.println(F("| 'r' -> Ler EEPROM (Posição 1)"));
-    Serial.println(F("| 'w' -> Escrever na EEPROM (Posição 1)"));
-    Serial.println(F("| 's' -> Alternar estado do pino SET"));
-    Serial.println(F("| 'l' -> Sair / iniciar LISTENER"));
-    Serial.println(F("| 't' -> Transmitir para o outro Arduino"));
-    Serial.println(F("|____________________________________"));
-
-    // Limpa qualquer lixo que tenha ficado no buffer da porta serial
-    while(Serial.available() > 0) { Serial.read(); }
-
-    // Trava o fluxo do Arduino neste menu até o usuário digitar 'L'
-    while (in_debug) {
-        if (Serial.available() > 0) {
-            char comando = Serial.read();
-
-            if (comando == 'c' || comando == 'C') {
-                Clock();
-            }
-            else if (comando == 'r' || comando == 'R') {
-                byte valor = readEEPROM(1); // Lê sempre da posição 1 (Shift Register)
-                Serial.print(F("[DEBUG] Valor lido: "));
-                Serial.println(valor);
-            }
-            else if (comando == 'w' || comando == 'W') {
-                Serial.println(F("[DEBUG] Digite um valor numérico (0-255) para gravar:"));
-                
-                while (Serial.available() == 0); // Trava esperando o usuário digitar o valor
-                int valor = Serial.parseInt();
-                
-                writeEEPROM(1, (byte)valor);
-                delay(10);
-                
-                Serial.print(F("[DEBUG] Valor "));
-                Serial.print(valor);
-                Serial.println(F(" escrito com sucesso."));
-            }
-            else if (comando == 's' || comando == 'S') {
-                estadoSet = !estadoSet;
-                digitalWrite(PIN_SET, estadoSet ? HIGH : LOW);
-                Serial.print(F("[DEBUG] Pino SET agora está: "));
-                Serial.println(estadoSet ? F("LIGADO") : F("DESLIGADO"));
-            }
-            else if (comando == 'l' || comando == 'L') {
-                Serial.println(F("\n[DEBUG] Saindo do console... Preparando Fluxo Principal."));
-                in_debug = false; // Quebra o laço while, devolvendo o controle para o main.cpp
-            }
-            
-
-
-        }
-    }
 }
 
 void Controller::writeEEPROM(int address, byte data) {
@@ -400,11 +311,11 @@ void Controller::IlluminateBlock(int blockIndex, byte color) {
 void Controller::FlushBlockLeds() {
     // Cada bloco ocupa 2 bits: [RED_EN | GREEN_EN]
     // BLOCK_COLOR_OFF    = 00, GREEN = 01, YELLOW = 11, RED = 10
-    // Total de bits: BLOCK_LED_MAX * 2  (enviados via shift register)
+    // Total de bits: BLOCK_LED_MAX * 2
 
 #if (PIN_BLOCK_LED_DATA != -1) && (PIN_BLOCK_LED_CLOCK != -1) && (PIN_BLOCK_LED_LATCH != -1)
     digitalWrite(PIN_BLOCK_LED_LATCH, LOW);
-    // Envia do bloco mais distante para o mais proximo (shift register empilha)
+    // Envia do bloco mais distante para o mais proximo
     for (int b = BLOCK_LED_MAX - 1; b >= 0; b--) {
         byte green_bit = 0, red_bit = 0;
         switch (blockLedState[b]) {

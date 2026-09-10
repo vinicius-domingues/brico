@@ -21,12 +21,9 @@ class Controller{
     bool is_loop = false;
 
     Controller();     // Construtor
-    void DebugMenu(); // Função de debug
-      void writeEEPROM(int address, byte data); // Grava na EEPROM (a mando do debug menu)
+    void writeEEPROM(int address, byte data); // Grava na EEPROM
     void Listener();  // Espera botão
     void Mapper(int sequence[], int& blocks_used);    // Mapeia todas as peças (forma a sequência, começa vazio)
-    void Clock();     // Dá clock
-    void Prepare();   // Prepara o shift register
     void transmitI2C(byte slaveAddress); // Comunica com o atuador
     void Stop();      // Só para o código naquele trecho para sempre
     void ShowState(int stateIndex); // Exibe estado via Serial
@@ -36,7 +33,7 @@ class Controller{
 
   private:
     byte readEEPROM(int address);
-    void FlushBlockLeds();           // Envia blockLedState[] ao hardware via shift register
+    void FlushBlockLeds();           // Envia blockLedState[] ao hardware dos LEDs dos blocos
     byte blockLedState[BLOCK_LED_MAX]; // Estado atual de cor de cada bloco
 
     // --- Auxiliares do Mapper() — protocolo bit-bang ---

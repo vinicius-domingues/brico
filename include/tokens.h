@@ -79,10 +79,6 @@
     #define PIN_LED_STRIP   23  // Fita NeoPixel (status da caixa)
     #define PIN_DATA_IN     18  // Leitura bit-bang dos blocos físicos
 
-    // Aliases de compatibilidade (usados internamente pelo Controller)
-    #define PIN_CLOCK  PIN_UART_RX  // Pino 16 — anteriormente clock do shift register
-    #define PIN_SET    PIN_UART_TX  // Pino 17 — anteriormente set do shift register
-
     #define I2C 8
     #define EEPROM_ADDR_0 0x50
     #define EEPROM_ADDR_1 0x51

@@ -73,6 +73,5 @@
   #define ERR_HW_I2C_FALHA             500  // Transmissão I2C não completou (Wire error)
   #define ERR_HW_SENSOR_TIMEOUT        501  // Sensor não respondeu dentro do tempo esperado
   #define ERR_HW_EEPROM_FALHA          502  // Leitura/escrita na EEPROM falhou
-  #define ERR_HW_SHIFT_OVERFLOW        503  // Shift register excedeu o número máximo de peças
 
 #endif
